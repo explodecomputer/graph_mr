@@ -33,10 +33,10 @@ Suppose we have $M$ traits, each of which can be instrumented. We can calculate 
 
 ## Introduction
 
-Growth in summary data for GWASs on phenotypes is on a steep trajectory, such that we may soon be asymptoting towards a situation where we can use two-sample MR to test 'everything against everything'. This promise, however, requires methodological advancements to address several issues including:
+Growth in summary data for GWASs on phenotypes is on a steep trajectory, such that we may soon be asymptoting towards a situation where we can use two-sample MR to test 'everything against everything'. This premise, however, requires methodological advancements to address several issues including:
 
 - Multiple testing
-- Decomposing many indirect effects into a terse set of direct effects
+- Decomposing many indirect or total effects into a terse set of direct effects
 
 The latter can be summarised as follows. Suppose there are five variables of interest, 1-5, and the causal relationships are
 
