@@ -89,14 +89,6 @@ graph_mr <- function(dat)
 	return(list(b=b, se=se))
 }
 
-get_orthogonal_graph <- function(res)
-{
-	a <- -solve(res$b)
-	diag(a) <- 1
-	return(a)
-}
-
-
 get_paths <- function(first, last, size)
 {
 	stopifnot(first <= size)
@@ -108,7 +100,10 @@ get_paths <- function(first, last, size)
 	for(i in combs)
 	{
 		b <- permutations(size, i, a)
-		l[[i-2]] <- b[b[,1] == first & b[,i] == last, , drop=FALSE]
+		b <- b[b[,1] == first & b[,i] == last, , drop=FALSE]
+		b1 <- b[,-c(1, ncol(b)), drop=FALSE]
+		index <- apply(b1, 1, function(x) all(diff(x) >= 1))
+		l[[i-2]] <- b[index, , drop=FALSE]
 	}
 	return(l)
 }
@@ -127,19 +122,61 @@ get_prods <- function(paths, mat)
 			out <- rep(0, l)
 			for(k in 1:l)
 			{
-				out[k] <- mat[r[k+1], r[k]]
+				out[k] <- mat[r[k], r[k+1]]
 			}
-			print(out)
 			s <- s + prod(out)
 		}
 	}
 	return(s)
 }
 
-plot_from_matrix <- function(mat)
+
+inversion_method <- function(res)
+{
+	a <- -solve(res$b)
+	diag(a) <- 1
+	return(a)
+}
+
+
+
+mediation_method <- function(res)
+{
+	mat <- res$b
+	n <- nrow(mat)
+	mmat <- matrix(0, nrow(mat), ncol(mat))
+	for(i in 1:n)
+	{
+		for(j in 1:n)
+		{
+			message(i, j, sep=" ")
+			if(i == j)
+			{
+				mmat[i,j] <- 1
+			} else {
+				p <- get_paths(i, j, n)
+				mmat[i,j] <- mat[i,j] - get_prods(p, mat)
+			}
+		}
+	}
+	return(mmat)
+}
+
+
+deconvolution_method <- function(res)
+{
+	mat <- res$b
+	out <- mat %*% solve(diag(nrow(mat)) + mat)
+	return(out)
+}
+
+
+plot_from_matrix <- function(mat, title="")
 {
 	diag(mat) <- 0
-	net <- graph.adjacency(round((mat), 1), weighted=TRUE, mode="directed")
-	E(net)$width <- E(net)$weight
-	plot(net)
+	net <- graph.adjacency(round(t(mat), 1), weighted=TRUE, mode="directed")
+	# E(net)$width <- E(net)$weight
+	plot(net, edge.label = E(net)$weight, main=title)
 }
+
+

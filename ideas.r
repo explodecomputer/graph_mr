@@ -1,68 +1,5 @@
----
-title: Deconvoluting causal networks
-author: Gibran Hemani
-date: "`r Sys.Date()`"
-output: pdf_document
----
 
 
-
-```{r, echo=FALSE}
-# http://www.mathpages.com/home/kmath198/2-1/2-1.htm
-# http://videolectures.net/gpip06_mackay_gpb/
-
-library(knitr)
-opts_chunk$set(warning=FALSE, message=FALSE, echo=FALSE)
-```
-
-```{r, echo=FALSE}
-set.seed(1234)
-read_chunk("~/repo/cit_measurement_error/scripts/mr_directionality_analysis.R")
-opts_chunk$set(warning=FALSE, message=FALSE, cache=TRUE, echo=FALSE)
-```
-
-source("functions.r")
-
-## Introduction
-
-Summary data for GWASs on phenotypes is becoming increasingly available, which is leading to the situation where we can test 'everything against everything'. With this capability does arise a number of problems, such as 
-
-- Multiple testing
-- Decomposing many indirect effects into a terse set of direct effects
-
-The latter problem can be summarised as follows. Suppose there are five variables of interest, 1-5, and the causal relationships are
-
-```
-1 -> 2
-2 -> 3
-3 -> 4
-4 -> 5
-```
-
-This can be depicted in graph form as:
-
-```{r }
-
-dat1 <- init_dat(500000, 5)
-dat1 <- make_edge(1, 2, -1, dat1)
-dat1 <- make_edge(2, 3, -2, dat1)
-dat1 <- make_edge(3, 4, 3, dat1)
-dat1 <- make_edge(4, 5, 4, dat1)
-
-plot_from_matrix(dat1$r)
-
-```
-
-If, however, we performed MR of 1 against 3, 1 against 4, 1 against 5, 2 against 4, etc, we would identify associations because they exist indirectly. Hence, our graph would look like:
-
-```{r }
-
-res1 <- graph_mr(dat1)
-plot_from_matrix(res1$b)
-
-```
-
-The task is to decompose 
 
 ```{r eval=FALSE}
 
@@ -271,6 +208,124 @@ mean(a)
 mean(b)
 
 plot(a,b)
+
+
+
+
+
+
+dat1 <- init_dat(500000, 4)
+dat1 <- make_edge(1,2,2, dat1)
+dat1 <- make_edge(2,3,3, dat1)
+dat1 <- make_edge(2,4,7, dat1)
+dat1 <- make_edge(1,3,4, dat1)
+dat1 <- make_edge(3,4,5, dat1)
+dat1 <- make_edge(1,4,6, dat1)
+res1 <- graph_mr(dat1)
+
+
+dat1 <- init_dat(500000, 4)
+dat1 <- make_edge(1, 2, -1, dat1)
+dat1 <- make_edge(2, 3, -2, dat1)
+dat1 <- make_edge(1, 3, 1, dat1)
+dat1 <- make_edge(1, 4, 3, dat1)
+dat1 <- make_edge(2, 4, -1, dat1)
+res1 <- graph_mr(dat1)
+
+dat1 <- init_dat(500000, 3)
+dat1 <- make_edge(1, 2, -1, dat1)
+dat1 <- make_edge(2, 3, -2, dat1)
+dat1 <- make_edge(1, 3, 1, dat1)
+res1 <- graph_mr(dat1)
+
+
+p <- 30
+dat2 <- init_dat(300000, p)
+for(i in 1:(p-1))
+{
+	dat2 <- make_edge(i, i + 1, runif(1), dat2)
+}
+res2 <- graph_mr(dat2)
+
+res1 <- res2
+dat1 <- dat2
+
+r <- res1$b
+a <- mediation_method(res1)
+b <- get_orthogonal_graph(res1)
+c <- deconvolution_method(res1)
+d <- dat1$r
+
+
+par(mfrow=c(2,2))
+plot(a,d)
+plot(b,d)
+plot(c,d)
+plot(r,d)
+
+
+plot(b,r)
+
+a
+b
+
+temp <- b + b %*% b + b %*% b %*% b + b %*% b %*% b %*% b + b %*% b %*% b %*% b %*% b
+
+plot(b,temp)
+plot(temp,r)
+
+
+r <- r - min(r)
+diag(r) <- 1
+
+pc <- eigen(r)
+
+
+plot(a,r)
+plot(b,r)
+plot(c,r)
+
+r[3,1]
+
+par(mfrow=c(2,2))
+plot_from_matrix(r)
+plot_from_matrix(b)
+plot_from_matrix(c)
+plot_from_matrix(d)
+
+
+r <- t(r)
+
+d[4,1]
+b[4,1]
+a[4,1]
+r[4,1]
+
+14
+
+1234
+124
+134
+
+r[4,1] - 
+r[2,1] * r[3,2] * r[4,3] -
+r[2,1] * r[4,2] -
+r[3,1] * r[4,3]
+
+
+r[1,4] - r[1,2] * r[2,3] * r[3,4] - r[1,2] * r[2,4] - r[1,3] * r[3,4]
+
+
+
+r[3,1] - a[3,2] * a[2,1] - a[3,4] * a[4,1] - a[3,2] * a[2,4] - a[4,1]
+r[3,1] - a[3,2] * a[2,1] - a[3,4] * a[4,1] - a[3,2] * a[2,4] - a[4,1]
+
+r
+
+
+
+plot_from_matrix(r)
+
 
 
 ```

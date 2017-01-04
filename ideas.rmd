@@ -3,8 +3,12 @@ title: Deconvoluting causal networks
 author: Gibran Hemani
 date: "`r Sys.Date()`"
 output: 
+  html_document: 
+    toc: true
   pdf_document:
     keep_tex: true
+    toc: true
+bibliography: ideas.bib
 ---
 
 
@@ -25,7 +29,7 @@ set.seed(1234)
 
 ## Introduction
 
-Growth in summary data for GWASs on phenotypes is on a steep trajectory, which is asymptoting twoards a situation where we can use two-sample MR to test 'everything against everything'. This promise, however, requires methodological advancements to address several issues including:
+Growth in summary data for GWASs on phenotypes is on a steep trajectory, such that we may soon be asymptoting towards a situation where we can use two-sample MR to test 'everything against everything'. This promise, however, requires methodological advancements to address several issues including:
 
 - Multiple testing
 - Decomposing many indirect effects into a terse set of direct effects
@@ -58,6 +62,7 @@ If, however, we performed MR of `1 -> 3`, `1 -> 4`, etc, we would identify assoc
 ```{r, fig.cap="Empirical associations"}
 
 res1 <- graph_mr(dat1)
+res1o <- inversion_method(res1)
 plot_from_matrix(res1$b)
 
 ```
@@ -67,7 +72,14 @@ The task is to decompose the complete set of associations into the direct effect
 - Identify direct pathways through which a particular exposure influences an outcome
 - Identify instances of partial mediation, which might suggest that there are unknown variables that remain to be uncovered that mediate the path from exposure to outcome
 
-MR for mediation has already been developed, especially for the case where there are only three phenotypic variables. Here, the direct effect of trait 1 on trait 2, $\beta_{1 \Rightarrow 2}$, is straightforward
+The procedure to do this would be as follows:
+
+1. Estimate the causal effect of every variable against every other variable. e.g. for a 5 variable graph, this means performing $5 \times 5 = 25$ MR analysies
+2. Deconvoluting this set of estimates into a matrix of direct effects
+
+Part 1 is crucial, and as MR techniques continue to improve (i.e. avoiding problems due to invalid instruments, improving power etc) this will become increasingly accurate. In these analyses I'll just assume that these total effects have been calculated reliably. Part 2 is the focus of this work.
+
+MR for mediation (AKA network MR) has already been developed, especially for the case where there are only three phenotypic variables [@Burgess2015a]. Here, the direct effect of trait 1 on trait 2, $\beta_{1 \Rightarrow 2}$, is straightforward
 
 $$
 \beta_{1 \Rightarrow 2} = \beta_{1 \rightarrow 2} - \beta_{1 \rightarrow 3}\beta_{3 \rightarrow 2}
@@ -77,254 +89,402 @@ With four variables it looks like:
 
 $$
 \begin{aligned}
-
 \beta_{1 \Rightarrow 2} = \beta_{1 \rightarrow 2} & - \beta_{1 \rightarrow 3}\beta_{3 \rightarrow 4}\beta_{4 \rightarrow 2} \\
 & - \beta_{1 \rightarrow 3} \beta_{3 \rightarrow 2} \\
 & - \beta_{1 \rightarrow 4} \beta_{4 \rightarrow 2}
-
 \end{aligned}
 $$
 
-```{r, eval=FALSE, fig.cap="MR for mediation"}
+With five variables it looks like:
 
-r <- matrix(0,6,6)
-r[1,2] <- 1
-r[2,3] <- 1
-r[2,4] <- 1
-r[4,3] <- 1
-r[5,4] <- 1
-r[6,2] <- 1
-r[6,3] <- 1
-r[6,4] <- 1
+$$
+\begin{aligned}
+\beta_{1 \Rightarrow 2} = \beta_{1 \rightarrow 2} & - \beta_{1 \rightarrow 3}\beta_{3 \rightarrow 4}\beta_{4 \rightarrow 5}\beta_{5 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 3} \beta_{3 \rightarrow 4} \beta_{4 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 3} \beta_{3 \rightarrow 5} \beta_{5 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 4} \beta_{4 \rightarrow 5} \beta_{5 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 3} \beta_{3 \rightarrow 5} \beta_{4 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 3} \beta_{3 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 4} \beta_{4 \rightarrow 2} \\
+& - \beta_{1 \rightarrow 5} \beta_{5 \rightarrow 2}
+\end{aligned}
+$$
 
-plot_from_matrix(r)
+and this is performed for each of the $5 \times 5$ possible pairwise combinations of variables, ultimately reducing a matrix of total effect relationships, $R_{t}$ e.g.
+
+```{r }
+round(res1$b, 1)
+```
+
+into a matrix of direct relationships, $R_{d}$ e.g.
+
+```{r }
+dat1$r
+# round(mediation_method(res1))
+```
+
+There are two problems with this approach. First, the combinatorial increase in the number of terms that are required for calculating the direct effects gets large very quickly. For example, for a graph with 10 variables there are 52 unique paths for each of the 100 elements in the matrix, and identifying those paths itself is a computationally slow process. Second, perhaps more importantly, this method may not actually generalise beyond the three-variable graph.
+
+\newpage
+
+## Simulations
+
+I will assume that there are $M$ variables measured in $N$ samples represented in a $N \times M$ matrix $P$. Further, each variable has a valid instrument, hence there are $M$ instruments also, represented in a $N \times M$ matrix $G$. As stated above, in this analysis I am assuming that every causal estimate made by MR is reliable.
+
+DAGs are simulated such that the $M$ variables are related to each other by random causal effects. Cycles are avoided. Following on, two-stage least squares is used to calculate all pairwise causal relationships e.g.
+
+$$
+R_{t}(1 \rightarrow 2) = \frac{cov(P_{,2}, G_{,1} cov(P_{,1}, G_{,1} / var(G_{,1})))} { var(G_{,1} cov(P_{,1}, G_{,1} / var(G_{,1}))) }	
+$$
+
+Three methods are then used to try to deconvolve the graph $R_{t}$ into $R_{d}$.
+
+### Method 1 - mediation by MR
+
+This is as described in the Introduction
+
+
+### Method 2 - inversion
+
+Simply a method to orthogonalise the matrix by 
+
+$$
+R_{d} = R_{t}^{-1}
+$$
+
+
+### method 3 - Feizi deconvolution
+
+In [@Feizi2013] a method is outlined for network deconvolution that is primarily aimed at correlation matrices (i.e. symmetric, non-causal versions of $R_{t}$). The method is:
+
+$$
+R_{d} = R_{t}(I + R_{t})^{-1}
+$$
+
+\newpage
+
+## Results
+
+
+### Simulation 1 - three-variable networks
+
+```{r }
+
+dat <- init_dat(500000, 3)
+dat <- make_edge(1,2,2, dat)
+dat <- make_edge(2,3,3, dat)
+dat <- make_edge(1,3,7, dat)
+res <- graph_mr(dat)
+res1 <- mediation_method(res)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
 
 ```
 
+Simulate 500000 samples with three variables, with the following real causal structure
+
+```{r, fig.cap="Three variables, N=500000" }
+
+par(mfrow=c(2,3))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot(1, type="n", axes=F, xlab="", ylab="")
+plot_from_matrix(res1, "Mediation method")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
+
+```
+
+The three methods agree on the causal structures as the true graph. The total effects graph has much larger effects for $1 \rightarrow 3$ as expected, because this is the sum of the direct and indirect effects. The Feizi method shrinks the effect sizes somewhat.
+
+* * *
+
+### Simulation 2 - four-variable networks
+
+```{r }
+
+dat <- init_dat(500000, 4)
+dat <- make_edge(1,2,2, dat)
+dat <- make_edge(2,3,3, dat)
+dat <- make_edge(1,3,7, dat)
+dat <- make_edge(1,4,-2, dat)
+dat <- make_edge(2,4,-4, dat)
+
+res <- graph_mr(dat)
+res1 <- mediation_method(res)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
+
+```
+
+Simulate 500000 samples with three variables, with the following real causal structure
+
+```{r, fig.cap="Graphs of four variables, N=500000" }
+
+par(mfrow=c(2,3))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot(1, type="n", axes=F, xlab="", ylab="")
+plot_from_matrix(res1, "Mediation method")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
+
+```
+
+Similar story to the three variable network, but of course there aresome paths in the $R_{t}$ which should not be present in the estimates of $R_{d}$. Another way to evaluate agreement is to plot the values of the matrix elements against the true matrix elements, e.g.
+
+```{r, fig.cap="Matrix elements of four variables, N=500000"}
+
+par(mfrow=c(2,2))
+plot(res1 ~ dat$r, xlab="True", ylab="Mediation")
+plot(res2 ~ dat$r, xlab="True", ylab="Inversion")
+plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
+plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
+
+```
+
+Here we can see that the mediation and inversion methods are reasonably accurate, but the Feizi method seems to be very close to the total effects.
 
 
+* * *
 
+### Simulation 3 - four-variable networks, more complex
 
+```{r }
 
+dat <- init_dat(500000, 4)
+dat <- make_edge(1,2,2, dat)
+dat <- make_edge(2,3,3, dat)
+dat <- make_edge(2,4,7, dat)
+dat <- make_edge(1,3,4, dat)
+dat <- make_edge(3,4,5, dat)
+dat <- make_edge(1,4,6, dat)
 
+res <- graph_mr(dat)
+res1 <- mediation_method(res)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
 
+```
 
+Here the graph is slightly more complex
 
+```{r, fig.cap="Graphs of four variables, N=500000" }
 
+par(mfrow=c(2,3))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot(1, type="n", axes=F, xlab="", ylab="")
+plot_from_matrix(res1, "Mediation method")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
 
-```{r eval=FALSE}
+```
 
-dat1 <- init_dat(500000, 5)
-dat1 <- make_edge(1, 2, -1, dat1)
-dat1 <- make_edge(1, 3, -2, dat1)
-dat1 <- make_edge(2, 3, 3, dat1)
-dat1 <- make_edge(3, 4, 4, dat1)
-dat1 <- make_edge(3, 5, 5, dat1)
-res1 <- graph_mr(dat1)
+And it can be seen that the mediation method does not resolve the direct effects accurately for one particular edge
 
-res1
+```{r, fig.cap="Matrix elements of four variables, N=500000"}
 
-plot_from_matrix(res1$b)
+par(mfrow=c(2,2))
+plot(res1 ~ dat$r, xlab="True", ylab="Mediation")
+plot(res2 ~ dat$r, xlab="True", ylab="Inversion")
+plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
+plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
 
-res1o <- get_orthogonal_graph(res1)
+```
 
-res1o
-plot_from_matrix(round(res1o,1))
-plot_from_matrix(dat1$r)
-dat1
-names(dat1)
-dat1$r
+* * *
+
+### Simulation 4 - five variables, causal chain
+
+```{r }
+
+dat <- init_dat(500000, 5)
+dat <- make_edge(1,2,2, dat)
+dat <- make_edge(2,3,3, dat)
+dat <- make_edge(3,4,7, dat)
+dat <- make_edge(4,5,4, dat)
+
+res <- graph_mr(dat)
+res1 <- mediation_method(res)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
+
+```
+
+Increasing to 5 variables, and there is a clear problem with the mediation and Feizi methods
+
+```{r, fig.cap="Graphs of five variables, N=500000" }
+
+par(mfrow=c(2,3))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot(1, type="n", axes=F, xlab="", ylab="")
+plot_from_matrix(res1, "Mediation method")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
+
+```
+
+The inversion method seems to be fairly reliable
+
+```{r, fig.cap="Matrix elements of five variables, N=500000"}
+
+par(mfrow=c(2,2))
+plot(res1 ~ dat$r, xlab="True", ylab="Mediation")
+plot(res2 ~ dat$r, xlab="True", ylab="Inversion")
+plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
+plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
+
+```
+
+* * *
+
+### Simulation 5 - 15 variables
+
+```{r }
 
 p <- 15
-dat2 <- init_dat(500000, p)
+dat <- init_dat(300000, p)
 for(i in 1:(p-1))
 {
-	dat2 <- make_edge(i, i + 1, rnorm(1), dat2)
+	dat <- make_edge(i, i + 1, rnorm(1), dat)
 }
-res2 <- graph_mr(dat2)
-res2o <- get_orthogonal_graph(res2)
-
-round(res2o,1)
-round(dat2$r,1)
-plot(res2o ~ dat2$r)
-
-
-
-dat3 <- init_dat(500000, 4)
-dat3 <- make_edge(1,2,2, dat3)
-dat3 <- make_edge(2,3,3, dat3)
-dat3 <- make_edge(2,4,7, dat3)
-dat3 <- make_edge(1,3,4, dat3)
-dat3 <- make_edge(3,4,5, dat3)
-dat3 <- make_edge(1,4,6, dat3)
-res3 <- graph_mr(dat3)
-
-res3
-
-dat3$r
-round(res3$b,1)
-net3 <- graph.adjacency(t(dat3$r), weighted=TRUE, mode="directed")
-E(net3)$width <- abs(E(net3)$weight)
-plot(net3)
-
-dat3$r[3,1] - (res3$b[3,1] - get_prods(get_paths(1, 3, 4), round(res3$b, 1)))
-dat3$r[3,2] - (res3$b[3,2] - get_prods(get_paths(2, 3, 4), round(res3$b, 1)))
-dat3$r[4,2] - (res3$b[4,2] - get_prods(get_paths(2, 4, 4), round(res3$b, 1)))
-dat3$r[4,3] - (res3$b[4,3] - get_prods(get_paths(3, 4, 4), round(res3$b, 1)))
-dat3$r[4,1] - (res3$b[4,1] - get_prods(get_paths(1, 4, 4), round(res3$b, 1)))
-
-
-# Get all the direct effect products
-
-# Problem: within the raw matrix there are compound effects, e.g. 1-2 is direct, 1-3 is direct plus indirect, so the 1-3 element is not the orthogonal effect. To get 1-4 (via 2 and 3) we need the direct and indirect paths for all intermediate nodes. 
-
-# Solution: Work from the network rather than the matrix. Make the network sparse, identify all paths between 1 and 4
-
-# Network deconvolution: http://www.nature.com/nbt/journal/v31/n8/full/nbt.2635.html
-# https://github.com/gidonro/Network-Deconvolution/blob/master/ND.py
-
-
-
-dat3$r %*% solve(diag(4) - dat3$r)
-
-dat3$r %*% (diag(4) + dat3$r + dat3$r %*% dat3$r^2 + dat3$r %*% dat3$r^2 %*% dat3$r^2)
-
-res3$b
-
-
-
-# Find all the paths in a sparse adjacency matrix
-# Work on these instead of the full matrix
-#
-
-
-
-dat4 <- init_dat(500000, 3)
-dat4 <- make_edge(1,2,2, dat4)
-dat4 <- make_edge(2,3,3, dat4)
-dat4 <- make_edge(1,3,4, dat4)
-res4 <- graph_mr(dat4)
-
-res4
-
-dat4$r
-
-get_prods(get_paths(1, 3, 3), res4$b)
-
-
-
-round(-solve(res1$b))
-
-
-r <- matrix(0,5,5)
-
-
-
-r <- matrix(0,5,5)
-diag(r) <- 1
-r[2,1] <- -1
-r[3,1] <- -2
-r[3,2] <- 3
-r[4,3] <- 4
-r[5,3] <- 5
-
-plot_from_matrix(r)
-
-
-
-
-
-r <- matrix(0,5,5)
-diag(r) <- 1
-r[1,2] <- 4
-r[2,3] <- -2
-r[3,4] <- 8
-r[4,5] <- -3
-
-plot_from_matrix(r)
-
-
-effs <- c(1:5)
-n <- 500000
-g <- scale(matrix(rbinom(n*5, 2, 0.5), n))
-a <- g[,1] + rnorm(n)
-b <- g[,2] + rnorm(n)
-c <- g[,3] + rnorm(n)
-d <- g[,4] + rnorm(n)
-e <- g[,5] + rnorm(n)
-d <- data.frame(a, b, c, d, e)
-
-d[,2] <- d[,2] + d[,1] * 
-
-b <- b + a * -1
-c <- c + a * -2
-c <- c + b * 3
-d <- d + c * 4
-e <- e + c * 5
-
-
-
-round(b)
-round(solve(b))
-r
-table(r==-round(solve(b)))
-
-
-
-# library(glasso)
-# out <- glasso(b, rho=0.5)
-
-
-
-
-library(igraph)
-
-net3 <- graph_from_incidence_matrix(abs(round(solve(b))))
-
-dev.new()
-plot(net)
-dev.new()
-plot(net2)
-dev.new()
-plot(net3)
-
-
-
-
-
-
-
-
-
-
-
-
-
-n <- 10000
-nstep <- 100
-ab <- 0.1
-ba <- 0.2
-
-a <- rnorm(n)
-b <- rnorm(n)
-
-for(i in 1:nstep)
-{
-	a <- a + b * ba
-	b <- b + a * ab
-}
-
-cor(a,b)
-mean(a)
-mean(b)
-
-plot(a,b)
-
+# dat <- make_edge(1,7,rnorm(1), dat)
+# dat <- make_edge(5,9,rnorm(1), dat)
+# dat <- make_edge(3,12,rnorm(1), dat)
+# dat <- make_edge(1,8,rnorm(1), dat)
+
+res <- graph_mr(dat)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
 
 ```
 
-Problems:
+After around 7 variables the mediation method becomes too slow to run, so that will be ignored for the subsequent simulations. Here, with 15 variables there is still reasonably good performance from the inversion method.
 
-- Cycles
-- Impossible associations
-- Non-gaussian effects
+```{r, fig.cap="Graphs of 15 variables, N=300000" }
+
+par(mfrow=c(2,2))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
+
+```
+
+
+```{r, fig.cap="Matrix elements of 15 variables, N=300000"}
+
+par(mfrow=c(2,2))
+plot(res2 ~ dat$r, xlab="True", ylab="Inversion")
+plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
+plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
+
+```
+
+
+* * *
+
+### Simulation 6 - 20 variables, more complex
+
+```{r }
+
+p <- 20
+dat <- init_dat(300000, p)
+for(i in 1:(p-1))
+{
+	dat <- make_edge(i, i + 1, rnorm(1), dat)
+}
+dat <- make_edge(1,7,rnorm(1), dat)
+dat <- make_edge(5,9,rnorm(1), dat)
+dat <- make_edge(3,12,rnorm(1), dat)
+dat <- make_edge(1,8,rnorm(1), dat)
+
+res <- graph_mr(dat)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
+
+```
+
+```{r, fig.cap="Graphs of 20 variables, N=300000" }
+
+par(mfrow=c(2,2))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
+
+```
+
+```{r, fig.cap="Matrix elements of 20 variables, N=300000"}
+
+par(mfrow=c(2,2))
+plot(res2 ~ dat$r, xlab="True", ylab="Inversion")
+plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
+plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
+
+```
+
+Here the inversion method has some issues, there are some indirect effects that should be set to 0 in the direct graph but have failed to have been removed.
+
+* * *
+
+### Simulation 7 - 30 variables, non-gaussian direct effects
+
+
+```{r }
+
+p <- 30
+dat <- init_dat(300000, p)
+for(i in 1:(p-1))
+{
+	dat <- make_edge(i, i + 1, rexp(1), dat)
+}
+
+res <- graph_mr(dat)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
+
+```
+
+Here the effect sizes are sampled from an exponential distribution rather than a normal distribution. The inversion method seems relatively robust to this.
+
+```{r, fig.cap="Graphs of 15 variables, N=300000" }
+
+par(mfrow=c(2,2))
+plot_from_matrix(dat$r, "True graph")
+plot_from_matrix(res$b, "Total effects")
+plot_from_matrix(res2, "Inversion method")
+plot_from_matrix(res3, "Feizi method")
+
+```
+
+
+```{r, fig.cap="Matrix elements of 15 variables, N=300000"}
+
+par(mfrow=c(2,2))
+plot(res2 ~ dat$r, xlab="True", ylab="Inversion")
+plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
+plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
+
+```
+
+
+## Summary
+
+The inversion method appears to be reasonably accurate in a range of scenarios, though not perfect when graphs become larger and relationships more complex. 
+
+
+Issues:
+
+- The mediation method might be interpreted too simplisticly here. I think there needs to be recursion beyond the 3 variable example - i.e. the direct effects are a function of indirect effects at the moment, but these indirect effects probably need to be reduced to direct effects also. This would require identifying a path through which to traverse the graph and recursively estimate the direct effects
+- These simulations only looked at relatively sparse graphs, and with no loops.
+- Why isn't the Feizi method working? Need to make sure it works for symmetric correlation graphs
+- Need to estimate standard errors of direct effects. This could be obtained by bootstrapping
+- Haven't evaluated the influence of cycles in the graph - this is hard to simulate though
+- How does this improve power? e.g. If A influences F through B, C, D, and E, is it easier to identify the intermediate path than the direct relationship?
+
+
+## References
+
