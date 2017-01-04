@@ -1,5 +1,5 @@
 ---
-title: Deconvoluting causal networks
+title: Resolving direct causal effects from causal networks
 author: Gibran Hemani
 date: "`r Sys.Date()`"
 output: 
@@ -25,6 +25,8 @@ opts_chunk$set(warning=FALSE, message=FALSE, cache=TRUE, echo=FALSE)
 set.seed(1234)
 
 ```
+
+**Code available at:** [https://scmv-ieugit.epi.bris.ac.uk/gh13047/graph_mr](https://scmv-ieugit.epi.bris.ac.uk/gh13047/graph_mr)
 
 ## Summary
 
