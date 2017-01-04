@@ -12,7 +12,6 @@ bibliography: ideas.bib
 ---
 
 
-
 ```{r, echo=FALSE, cache=FALSE}
 
 # http://www.mathpages.com/home/kmath198/2-1/2-1.htm
@@ -26,6 +25,11 @@ opts_chunk$set(warning=FALSE, message=FALSE, cache=TRUE, echo=FALSE)
 set.seed(1234)
 
 ```
+
+## Summary
+
+Suppose we have $M$ traits, each of which can be instrumented. We can calculate the causal relationships of $M \times M$ pairs of traits. This matrix of relationships is a set of 'total' effects, but to deconvolve into a set of 'direct' effects, it looks like simply taking the inverse of this matrix is quite reliable, and performs favourably compared to other methods of deconvolution.
+
 
 ## Introduction
 
@@ -471,7 +475,7 @@ plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
 ```
 
 
-## Summary
+## Discussion
 
 The inversion method appears to be reasonably accurate in a range of scenarios, though not perfect when graphs become larger and relationships more complex. 
 
@@ -484,7 +488,7 @@ Issues:
 - Need to estimate standard errors of direct effects. This could be obtained by bootstrapping
 - Haven't evaluated the influence of cycles in the graph - this is hard to simulate though
 - How does this improve power? e.g. If A influences F through B, C, D, and E, is it easier to identify the intermediate path than the direct relationship?
-
+- Graphical lasso may be useful to make the matrix sparse
 
 ## References
 
