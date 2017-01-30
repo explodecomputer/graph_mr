@@ -17,7 +17,9 @@ bibliography: ideas.bib
 # http://www.mathpages.com/home/kmath198/2-1/2-1.htm
 # http://videolectures.net/gpip06_mackay_gpb/
 
-library(knitr)
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
 
 read_chunk("functions.r")
 source("functions.r")
@@ -30,62 +32,50 @@ set.seed(1234)
 
 ## Summary
 
-Suppose we have $M$ traits, each of which can be instrumented. We can calculate the causal relationships of $M \times M$ pairs of traits. This matrix of relationships is a set of 'total' effects, but to deconvolve into a set of 'direct' effects, it looks like simply taking the inverse of this matrix is quite reliable, and performs favourably compared to other methods of deconvolution.
+Suppose we have complete summary statistics for an arbitrary number of traits, and each trait has valid instruments. Mendelian randomisation can be used to calculate the causal relationships of $M \times M$ pairs of traits, thereby constructing a matrix of *total* effects of each trait on each of the other traits. This paper introduces a method to deconvolve this matrix to obtain the set of all direct causal effects between the traits. It goes on to show that the statistical power of identifying causal relationships between traits improves substantially by chaining together the direct effects on the deconvolved pathway, when compared to evaluating the total effect as is typical in Mendelian randomisation.
 
 
 ## Introduction
 
-Growth in summary data for GWASs on phenotypes is on a steep trajectory, such that we may soon be asymptoting towards a situation where we can use two-sample MR to test 'everything against everything'. This premise, however, requires methodological advancements to address several issues including:
 
-- Multiple testing
-- Decomposing many indirect or total effects into a terse set of direct effects
+Many methods exist that attempt to decompose correlation matrices into a set of terse direct correlations, with a view towards obtaining the minimum set of correlations that can explain the observed matrix. This process is known as deconvolution [@Feizi2013] [describe other methods in more detail]. A typical use case in biology is to calculate the correlation matrix of gene expression levels, and deconvolve to identify genes that drive networks. The application of matrix deconvolution to the context of causal inference in Mendelian randomisation (MR), as shown in Figre 1, could have the following attractive features:
 
-The latter can be summarised as follows. Suppose there are five variables of interest, 1-5, and the causal relationships are
+- Identify direct pathways through which a particular exposure influences an outcome
+- Identify instances of partial mediation, which might suggest that there are unknown variables that remain to be uncovered that mediate the path from exposure to outcome
+- Potentially improve power in identifying causal relationships between traits that are on the same causal pathway
+
+Growth in available GWAS summary data on phenotypes is on a steep trajectory, such that we may soon be asymptoting towards a situation where we can use two-sample MR to test 'everything against everything'. What this entails is that we could construct a pairwise causal relationship of all (available) traits (e.g. see Figure 1a,b). Each element in such a matrix would represent the *total* causal effect between the two traits. The purpose of this paper is to explore how to deconvolve this set of *total* effects into a terse set of *direct* effects. 
+
+Attempts at constructing networks using MR have been proposed [@Burgess2015], based on the idea of mediation by MR [@Relton2012], though implementation of this method to more than three variables has not been demonstrated. While existing deconvolution methods can be applied to an arbitrary number of traits, they tend to require that the initial matrix is symmetrical, and they often do not incorporate information that disentangles correlation from causation. The setting for this paper assumes the contrary in both counts. The matrix of total MR effects is asymmetrical because the estimate of A on B (instrumented by SNPs that relate to A) is not the same as the estimate of B on A (instrumented by SNPs that relate to B). Further, each element in the matrix of total effects is assumed to be a causal estimate.
+
+
+
+
+## Methods
+
+
+### Assumptions
+
+1. It is important to acknowledge that, though beyond the scope of this paper, the premise of obtaining the causal effect of 'everything on everything' requires methodological advancements to address many issues, including but not limited to multiple testing, consideration of phenotypic definitions, and incorporating temporal effects and critical effect periods.
+
+2. We begin by assuming that the causal effect estimates of each element in the *total* effects matrix is unbiased (Figure 1a,b). In practice it is not yet clear how to ensure this, though methods are continually developing to improve the reliability of MR estimates to violations of its main assumptions [@Bowden2015; @Bowden2016a; @Bowden2016b; @Hemani2016].
+
+
+### Direct and total effects
+
+The latter can be summarised as follows. Suppose there are six variables of interest, 1-6, and the causal relationships are
 
 ```
 1 -> 2
 2 -> 3
 3 -> 4
 4 -> 5
+5 -> 6
 ```
 
-This can be depicted in graph form as in Figure 1.
+This can be depicted in graph form as in Figure 1e. If, however, we performed MR of `1 -> 3`, `1 -> 4`, etc, we would identify associations because they exist indirectly. Hence, after testing everything against everything our graph would look like Figure 1d.
 
-```{r, fig.cap="Simulated causal relationships"}
-
-dat1 <- init_dat(500000, 5)
-dat1 <- make_edge(1, 2, -1, dat1)
-dat1 <- make_edge(2, 3, -2, dat1)
-dat1 <- make_edge(3, 4, 1, dat1)
-dat1 <- make_edge(4, 5, 3, dat1)
-
-plot_from_matrix(dat1$r)
-
-```
-
-If, however, we performed MR of `1 -> 3`, `1 -> 4`, etc, we would identify associations because they exist indirectly. Hence, after testing everything against everything our graph would look like Figure 2.
-
-```{r, fig.cap="Empirical associations"}
-
-res1 <- graph_mr(dat1)
-res1o <- inversion_method(res1)
-plot_from_matrix(res1$b)
-
-```
-
-The task is to decompose the complete set of associations into the direct effects only. This has the following advantages:
-
-- Identify direct pathways through which a particular exposure influences an outcome
-- Identify instances of partial mediation, which might suggest that there are unknown variables that remain to be uncovered that mediate the path from exposure to outcome
-
-The procedure to do this would be as follows:
-
-1. Estimate the causal effect of every variable against every other variable. e.g. for a 5 variable graph, this means performing $5 \times 5 = 25$ MR analysies
-2. Deconvoluting this set of estimates into a matrix of direct effects
-
-Part 1 is crucial, and as MR techniques continue to improve (i.e. avoiding problems due to invalid instruments, improving power etc) this will become increasingly accurate. In these analyses I'll just assume that these total effects have been calculated reliably. Part 2 is the focus of this work.
-
-MR for mediation (AKA network MR) has already been developed, especially for the case where there are only three phenotypic variables [@Burgess2015a]. Here, the direct effect of trait 1 on trait 2, $\beta_{1 \Rightarrow 2}$, is straightforward
+MR for mediation (AKA network MR) operates in the case where there are three phenotypic variables [@Burgess2015a] as follows. The direct effect of trait 1 on trait 2, $\beta_{1 \Rightarrow 2}$, is obtained from:
 
 $$
 \beta_{1 \Rightarrow 2} = \beta_{1 \rightarrow 2} - \beta_{1 \rightarrow 3}\beta_{3 \rightarrow 2}
@@ -118,7 +108,17 @@ $$
 
 and this is performed for each of the $5 \times 5$ possible pairwise combinations of variables, ultimately reducing a matrix of total effect relationships, $R_{t}$ e.g.
 
-```{r }
+
+
+```{r, fig.cap="Simulated causal relationships"}
+
+dat1 <- init_dat(500000, 5)
+dat1 <- make_edge(1, 2, -1, dat1)
+dat1 <- make_edge(2, 3, -2, dat1)
+dat1 <- make_edge(3, 4, 1, dat1)
+dat1 <- make_edge(4, 5, 3, dat1)
+
+res1 <- graph_mr(dat1)
 round(res1$b, 1)
 ```
 
@@ -126,16 +126,16 @@ into a matrix of direct relationships, $R_{d}$ e.g.
 
 ```{r }
 dat1$r
-# round(mediation_method(res1))
 ```
 
-There are two problems with this approach. First, the combinatorial increase in the number of terms that are required for calculating the direct effects gets large very quickly. For example, for a graph with 10 variables there are 52 unique paths for each of the 100 elements in the matrix, and identifying those paths itself is a computationally slow process. Second, perhaps more importantly, this method may not actually generalise beyond the three-variable graph.
+There are two potential drawbacks with the MR for mediation approach. First, the combinatorial increase in the number of terms that are required for calculating the direct effects gets large very quickly. For example, for a graph with 10 variables there are 52 unique paths for each of the 100 elements in the matrix, and identifying those paths itself is a computationally slow process. Second, perhaps more importantly, this method may not actually generalise beyond the three-variable graph.
 
 \newpage
 
+
 ## Simulations
 
-I will assume that there are $M$ variables measured in $N$ samples represented in a $N \times M$ matrix $P$. Further, each variable has a valid instrument, hence there are $M$ instruments also, represented in a $N \times M$ matrix $G$. As stated above, in this analysis I am assuming that every causal estimate made by MR is reliable.
+Assume that there are $M$ variables measured in $N$ samples represented in a $N \times M$ matrix $P$. Further, each variable has a valid instrument, hence there are $M$ instruments also, represented in a $N \times M$ matrix $G$. As stated above, in this analysis I am assuming that every causal estimate made by MR is reliable.
 
 DAGs are simulated such that the $M$ variables are related to each other by random causal effects. Cycles are avoided. Following on, two-stage least squares is used to calculate all pairwise causal relationships e.g.
 
@@ -147,7 +147,7 @@ Three methods are then used to try to deconvolve the graph $R_{t}$ into $R_{d}$.
 
 ### Method 1 - mediation by MR
 
-This is as described in the Introduction
+This is as described in [Relton2012] and [Burgess2015a].
 
 
 ### Method 2 - inversion
@@ -158,8 +158,9 @@ $$
 R_{d} = R_{t}^{-1}
 $$
 
+If $R_{t}$ were a variance covariance matrix then this method is known as obtaining the precision matrix.
 
-### method 3 - Feizi deconvolution
+### Method 3 - Feizi deconvolution
 
 In [@Feizi2013] a method is outlined for network deconvolution that is primarily aimed at correlation matrices (i.e. symmetric, non-causal versions of $R_{t}$). The method is:
 
@@ -167,10 +168,16 @@ $$
 R_{d} = R_{t}(I + R_{t})^{-1}
 $$
 
+### Standard errors
+
+To obtain the standard errors of the direct effects for the inversion method, we can use bootstrapping. Here, each element in the matrix of total effects is resampled with $R_{t}(i,j)* \sim N(R_{t}(i,j), se(R_{t}(i,j)))$. The inversion method is then applied to the resampled matrix $R_{t}*$ and the results $R_{d}*$ are stored. This is performed 1000 times to obtain a distribution of effects for each element of the $R_{d}$ matrix. The standard deviation of the distribution from each element is taken to be the standard error of that direct effect estimate. 
+
+
 \newpage
 
 ## Results
 
+The analysis is divided into two sections. First, a demonstration that in most cases the inversion method is rapid and returns the true direct effects; and second, an evaluation of statistical power, particularly in comparing the ability to detect a total effect vs detecting a chain of .
 
 ### Simulation 1 - three-variable networks
 
@@ -237,7 +244,7 @@ plot_from_matrix(res3, "Feizi method")
 
 ```
 
-Similar story to the three variable network, but of course there aresome paths in the $R_{t}$ which should not be present in the estimates of $R_{d}$. Another way to evaluate agreement is to plot the values of the matrix elements against the true matrix elements, e.g.
+Similar story to the three variable network, but of course there are some paths in the $R_{t}$ which should not be present in the estimates of $R_{d}$. Another way to evaluate agreement is to plot the values of the matrix elements against the true matrix elements, e.g.
 
 ```{r, fig.cap="Matrix elements of four variables, N=500000"}
 
@@ -475,6 +482,103 @@ plot(res3 ~ dat$r, xlab="True", ylab="Feizi")
 plot(res$b ~ dat$r, xlab="True", ylab="Total effects")
 
 ```
+
+
+## Statistical power
+
+As an illustration, in the following analyses a 5-trait network is created as in figure 1. Is it statistically more efficient to 
+
+1. estimate the total effect of trait 1 on trait 5 using standard MR, or
+2. obtain the direct effects of the 5-trait network, and estimate the causal chain from trait 1 -> 2 -> 3 -> 4 -> 5.
+
+Strategy (2) entails finding a 'significant' p-value at each of the 4 direct relationships that map trait 1 to trait 5.
+
+
+```{r}
+
+test_sig <- function(res1, res1b)
+{
+	offdiag <- function(m, offset)
+	{
+		i <- seq_len(nrow(m)-offset)
+		j <- i + offset
+		m[cbind(i,j)]
+	}
+
+	n <- ncol(res1$b)
+	total <- pnorm(abs(res1$b[n,1]/res1$se[n,1]), lower.tail=FALSE)
+	chained <- max(offdiag(t(res1b$pval), 1))
+	return(c(total, chained))
+}
+
+L <- list()
+nsim <- 100
+for(n in 3:6)
+{
+	message(n, " pos")
+	l <- list()
+	for(j in 1:nsim)
+	{
+		dat1 <- init_dat(5000, n)
+		for(i in 1:(n-1))
+		{
+			dat1 <- make_edge(i, i+1, rnorm(1), dat1)
+		}
+		res1 <- graph_mr(dat1)
+		res1b <- bootstrap_graphs(res1)
+		l[[j]] <- test_sig(res1, res1b)
+	}
+	lpos <- as.data.frame(do.call(rbind, l))
+	lpos$n <- n
+	lpos$model <- "Non-null"
+
+	message(n, " neg")
+	l <- list()
+	for(j in 1:nsim)
+	{
+		dat1 <- init_dat(5000, n)
+		res1 <- graph_mr(dat1)
+		res1b <- bootstrap_graphs(res1)
+		l[[j]] <- test_sig(res1, res1b)
+	}
+
+	lneg <- as.data.frame(do.call(rbind, l))
+	lneg$n <- n
+	lneg$model <- "Null"
+
+	L[[n]] <- rbind(lpos, lneg)
+}
+A <- bind_rows(L)
+
+```
+
+The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta ~ N(0,1)$. 
+
+```{r, fig.caption="Statistical power comparison between standard MR and graph MR using inversion method. Top graph shows the results from simulations where causal influences were simulated with non-zero effect sizes. Bottom graph shows depicts the false discovery rate, i.e. the same simulation but where all effect sizes are 0."}
+
+AA <- gather(A, key='strategy', value='pval', V1, V2)
+AA$strategy <- as.factor(AA$strategy)
+levels(AA$strategy) <- c("Total effect", "Chained direct effects")
+
+# ggplot(AA, aes(x=as.factor(n), y=-log10(pval))) +
+# geom_boxplot(aes(fill=strategy)) +
+# facet_grid(model ~ ., scale="free_y") +
+# scale_y_log10() +
+# labs(y="-log10(pval)", x="Graph size (e.g. number of traits from 1 to n)")
+
+AAg <- AA %>% group_by(n, model, strategy) %>% summarise(propsig = sum(pval < 0.05))
+
+ggplot(AAg, aes(x=as.factor(n), y=propsig)) +
+geom_bar(stat="identity", aes(fill=strategy), position="dodge") +
+facet_grid(model ~ .) +
+labs(y=paste0("Number of simulations (out of ", nsim, ") with p < 0.05"), x="Graph size (e.g. number of traits from 1 to n)")
+
+```
+
+
+
+Here it is apparent that as the causal chain grows larger the statistical power of the second strategy, which uses the direct effects estimated from the graph, becomes substantially more powerful than the standard approach of identifying the total causal effect. The false discovery rate of the second strategy appears to compare favourably also.
+
 
 
 ## Discussion

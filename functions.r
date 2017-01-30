@@ -79,7 +79,7 @@ graph_mr <- function(dat)
 		{
 			if(i != j)
 			{
-				message(i, j)
+				# message(i, j)
 				a <- tsls(dat$d[,i], dat$d[,j], dat$g[,j])
 				b[i,j] <- a$bhat
 				se[i,j] <- a$se
@@ -149,7 +149,7 @@ mediation_method <- function(res)
 	{
 		for(j in 1:n)
 		{
-			message(i, j, sep=" ")
+			# message(i, j, sep=" ")
 			if(i == j)
 			{
 				mmat[i,j] <- 1
@@ -179,4 +179,30 @@ plot_from_matrix <- function(mat, title="")
 	plot(net, edge.label = E(net)$weight, main=title)
 }
 
+
+bootstrap_graphs <- function(res, nboot=1000, minp=1e-300)
+{
+	n <- ncol(res$b)
+	l <- list()
+	newb <- list()
+	for(i in 1:nboot)
+	{
+		newb$b <- matrix(rnorm(n * n, mean=res$b, sd=res$se), n, n)
+		l[[i]] <- inversion_method(newb)
+	}
+
+	addsq <- function(x, y) {
+		return(x^2 + y^2)
+	}
+
+	m <- Reduce('+', l)
+	m2 <- Reduce('+', lapply(l, function(x) x^2))
+	
+	b <- inversion_method(res)
+	se <- sqrt((m2 - m^2 / nboot) / nboot)
+	pval <- pnorm(abs(b/se), lower=FALSE)
+	pval[pval < minp] <- minp
+	diag(pval) <- 0
+	return(list(b=b, se=se, pval=pval))
+}
 
