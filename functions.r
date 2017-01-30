@@ -1,6 +1,11 @@
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(igraph))
 suppressPackageStartupMessages(library(gtools))
+suppressPackageStartupMessages(library(gridExtra))
+suppressPackageStartupMessages(library(network))
+suppressPackageStartupMessages(library(sna))
+suppressPackageStartupMessages(library(ggnetwork))
+
 
 fastAssoc <- function(y, x)
 {
@@ -178,6 +183,20 @@ plot_from_matrix <- function(mat, title="")
 	# E(net)$width <- E(net)$weight
 	plot(net, edge.label = E(net)$weight, main=title)
 }
+
+
+plot_from_matrix_clean <- function(mat, title="")
+{
+	diag(mat) <- 0
+	n <- network(round(t(mat), 1))
+	p <- ggplot(n, aes(x = x, y = y, xend = xend, yend = yend)) +
+	geom_edges(arrow = arrow(length = unit(6, "pt"), type = "closed")) +
+	geom_nodes() +
+	theme_blank() +
+	labs(title=title)
+	return(p)
+}
+
 
 
 bootstrap_graphs <- function(res, nboot=1000, minp=1e-300)
