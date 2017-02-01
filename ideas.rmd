@@ -244,7 +244,7 @@ labs(x="True (simulated) direct effects", y="Estimated effects for each method")
 
 Further simulations of more complex graphs are now performed. Beyond 7 variables the mediation method is computationally intractible using the algorithm as implemented here, but regardless it can be seen that any models more complex than those shown in Figure 2 lead to the mediation method exhibiting departures from the simulated effects. 
 
-The models tested are shown in Figures 3-7. There is a mixture of different numbers of variables, different model complexities, and simulating effect sizes from non-guassian distributions. A comparison of the deconvolved effect estimates from each of these models against the true simulated effects is shown in Figure 8.
+The models tested are shown in Figures 4-8. There is a mixture of different numbers of variables, different model complexities, and simulating effect sizes from non-guassian distributions. A comparison of the deconvolved effect estimates from each of these models against the true simulated effects is shown in Figure 9.
 
 The inversion method performs reliably in most cases, however occasionally in more complex models there will appear to be some direct effects that have non-zero estimates where they should have had no effect. This may be an indication of saturation.
 
