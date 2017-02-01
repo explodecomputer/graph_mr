@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library(gridExtra))
 suppressPackageStartupMessages(library(network))
 suppressPackageStartupMessages(library(sna))
 suppressPackageStartupMessages(library(ggnetwork))
-
+suppressPackageStartupMessages(library(igraph))
 
 fastAssoc <- function(y, x)
 {
