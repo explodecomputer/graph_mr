@@ -225,3 +225,48 @@ bootstrap_graphs <- function(res, nboot=1000, minp=1e-300)
 	return(list(b=b, se=se, pval=pval))
 }
 
+
+find_path <- function(mat, thresh, from, to)
+{
+	g1 <- graph_from_adjacency_matrix(mat < thresh, mode="directed")
+	res <- all_shortest_paths(g1, from, to)
+	a <- length(res$res) > 0
+	if(a)
+	{
+		n <- length(res$res[[1]]) - 1
+		c1 <- res$res[[1]][1:n]
+		c2 <- res$res[[1]][2:(n+1)]
+		return(min(mat[rbind(c1, c2)]))
+	} else {
+		return(1)
+	}
+}
+
+offdiag <- function(m, offset)
+{
+	i <- seq_len(nrow(m)-offset)
+	j <- i + offset
+	m[cbind(i,j)]
+}
+
+test_sig <- function(res1, res1b)
+{
+
+	n <- ncol(res1$b)
+	total <- pnorm(abs(res1$b[n,1]/res1$se[n,1]), lower.tail=FALSE)
+
+	# chained <- max(offdiag(t(res1b$pval), 1))
+	chained <- find_path(t(res1b$pval), 0.05, 1, n)
+	return(c(total, chained))
+}
+
+
+
+func <- function(n)
+{
+	mat <- matrix(1,n,n)
+	g1 <- graph_from_adjacency_matrix(mat, mode="directed")
+	return(table(sapply(all_simple_paths(g1, 1,2), length)))
+}
+
+
