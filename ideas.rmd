@@ -18,8 +18,6 @@ csl: nature.csl
 # http://videolectures.net/gpip06_mackay_gpb/
 
 suppressPackageStartupMessages(library(knitr))
-suppressPackageStartupMessages(library(tidyr))
-suppressPackageStartupMessages(library(ggplot2))
 
 read_chunk("functions.r")
 source("functions.r")
@@ -489,7 +487,10 @@ A <- bind_rows(L)
 
 ```
 
-The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta ~ N(0,1)$. 
+The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta ~ N(0,1)$.
+
+To generate the FDR, a different dataset was generated with no simulated causal paths. A graph traversal algorithm is applied to find a path of significant links to make a chain from 1 to 6. This is not constrained to go through 2,3,4,5, it can go through any path to get from 1 to 6. 
+
 
 ```{r, fig.cap="Statistical power comparison between standard MR and graph MR using inversion method. Top graph shows the results from simulations where causal influences were simulated with non-zero effect sizes. Bottom graph shows depicts the false discovery rate, i.e. the same simulation but where all effect sizes are 0." }
 
@@ -514,8 +515,89 @@ labs(y=paste0("Number of simulations (out of ", nsim, ") with p < 0.05"), x="Gra
 
 
 
-Here it is apparent that as the causal chain grows larger the statistical power of the second strategy, which uses the direct effects estimated from the graph, becomes substantially more powerful than the standard approach of identifying the total causal effect. The false discovery rate of the second strategy appears to compare favourably also.
+Here it is apparent that as the causal chain grows larger the statistical power of the second strategy, which uses the direct effects estimated from the graph, becomes substantially more powerful than the standard approach of identifying the total causal effect. The false discovery rate of the second strategy appears grow as the graph size grows also though.
 
+The number of possible $k$ length paths between two nodes in a graph of size $n$ is given as 
+
+$$
+p_n(k) = \frac{(n - 2)!}{(n - k)!}
+$$
+
+and the probability of a false discovery for a path of length $k$ is $\alpha^k$ where $\alpha$ here is 0.05. Hence, the probability of finding a path between two nodes is
+
+$$
+FDR(i,j) = \alpha + \sum^n_{k=2} \alpha^k \frac{(n - 2)!}{(n - k)!}
+$$
+
+This has the following relationship with growing graph sizes
+
+```{r}
+
+calc_number_of_paths <- function(n, thresh, maxpathlength = n)
+{
+	stopifnot(n >= 3)
+	stopifnot(maxpathlength >= 1 & maxpathlength <= n)
+	vec <- array(0, maxpathlength)
+	vec[1:min(2, maxpathlength)] <- 1
+	# fac <- factorial(n - 2)
+	for(i in 3:maxpathlength)
+	{
+		# vec[i] <- fac / factorial(n - i)
+		# print(fac / factorial(n - i))
+		vec[i] <- prod(n - c(2:(i-1)))
+		# print(prod(n - c(2:(i-1))))
+	}
+
+
+	p <- thresh ^ c(1:maxpathlength)
+	dat <- data.frame(k = 1:maxpathlength, npath = vec, p = p, fdr = vec * p)
+	return(dat)
+}
+
+l <- list()
+param <- expand.grid(n = 3:300, thresh=c(0.05, 0.04, 0.03, 0.02, 0.01))
+for(i in 1:nrow(param))
+{
+	l[[i]] <- calc_number_of_paths(param$n[i], param$thresh[i], min(param$n[i]))
+	l[[i]]$n <- param$n[i]
+	l[[i]]$thresh <- param$thresh[i]
+}
+
+
+l <- bind_rows(l)
+
+l1 <- group_by(l, n, thresh) %>%
+	summarise(fdr=pmin(1, sum(fdr)))
+
+ggplot(l1, aes(x=n, y=fdr)) +
+geom_point(aes(colour=as.factor(thresh))) +
+geom_line(aes(colour=as.factor(thresh))) +
+labs(x="Number of traits in graph", y="False discovery rate for finding a path between any two nodes", colour="Threshold for\nsignificant\nlink in path")
+
+```
+
+
+What does this look like e.g. for 50 trait graph with $\alpha = 0.05$?
+
+```{r}
+
+m <- subset(l, n %in% c(20, 40, 60, 80, 100) & thresh == 0.05)
+ggplot(m, aes(x=k, y=fdr)) +
+geom_point(aes(colour=as.factor(n))) +
+geom_line(aes(colour=as.factor(n))) +
+facet_wrap(~ n, scale="free") +
+labs(x="Chain length", y="FDR, not limited to 1", colour="Graph size")
+
+```
+
+We could limit the maximum path length to e.g. six. This would basically 
+
+
+
+
+- Does not account for sparse graphs that have known number of significant edges
+
+- Limit the possible chain length
 
 
 ## Discussion

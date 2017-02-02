@@ -1,3 +1,5 @@
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(igraph))
 suppressPackageStartupMessages(library(gtools))
@@ -262,11 +264,10 @@ test_sig <- function(res1, res1b)
 
 
 
-func <- function(n)
+find_number_of_paths <- function(n)
 {
 	mat <- matrix(1,n,n)
 	g1 <- graph_from_adjacency_matrix(mat, mode="directed")
 	return(table(sapply(all_simple_paths(g1, 1,2), length)))
 }
-
 
