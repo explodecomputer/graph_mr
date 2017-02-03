@@ -251,15 +251,17 @@ offdiag <- function(m, offset)
 	m[cbind(i,j)]
 }
 
-test_sig <- function(res1, res1b)
+test_sig <- function(res1, res1b, thresh=0.05)
 {
 
 	n <- ncol(res1$b)
-	total <- pnorm(abs(res1$b[n,1]/res1$se[n,1]), lower.tail=FALSE)
+	pos1 <- pnorm(abs(res1$b[n,1]/res1$se[n,1]), lower.tail=FALSE)
+	pos2 <- find_path(t(res1b$pval), thresh, 1, n)
 
-	# chained <- max(offdiag(t(res1b$pval), 1))
-	chained <- find_path(t(res1b$pval), 0.05, 1, n)
-	return(c(total, chained))
+	neg1 <- pnorm(abs(res1$b[1,n]/res1$se[1,n]), lower.tail=FALSE)
+	neg2 <- find_path(t(res1b$pval), thresh, n, 1)
+
+	return(rbind(c(pos1, pos2), c(neg1, neg2)))
 }
 
 
