@@ -223,7 +223,7 @@ bootstrap_graphs <- function(res, nboot=1000, minp=1e-300)
 	se <- sqrt((m2 - m^2 / nboot) / nboot)
 	pval <- pnorm(abs(b/se), lower=FALSE)
 	pval[pval < minp] <- minp
-	diag(pval) <- 0
+	diag(pval) <- 1
 	return(list(b=b, se=se, pval=pval))
 }
 
@@ -238,7 +238,7 @@ find_path <- function(mat, thresh, from, to)
 		n <- length(res$res[[1]]) - 1
 		c1 <- res$res[[1]][1:n]
 		c2 <- res$res[[1]][2:(n+1)]
-		return(min(mat[rbind(c1, c2)]))
+		return(max(mat[rbind(c1, c2)]))
 	} else {
 		return(1)
 	}
@@ -258,8 +258,8 @@ test_sig <- function(res1, res1b, thresh=0.05)
 	pos1 <- pnorm(abs(res1$b[n,1]/res1$se[n,1]), lower.tail=FALSE)
 	pos2 <- find_path(t(res1b$pval), thresh, 1, n)
 
-	neg1 <- pnorm(abs(res1$b[1,n]/res1$se[1,n]), lower.tail=FALSE)
-	neg2 <- find_path(t(res1b$pval), thresh, n, 1)
+	neg1 <- pnorm(abs(res1$b[n-1,n]/res1$se[n-1,n]), lower.tail=FALSE)
+	neg2 <- find_path(t(res1b$pval), thresh, n, n-1)
 
 	return(rbind(c(pos1, pos2), c(neg1, neg2)))
 }
@@ -273,3 +273,42 @@ find_number_of_paths <- function(n)
 	return(table(sapply(all_simple_paths(g1, 1,2), length)))
 }
 
+
+
+calc_number_of_paths <- function(n, thresh, maxpathlength = n)
+{
+	stopifnot(n >= 3)
+	stopifnot(maxpathlength >= 1 & maxpathlength <= n)
+	vec <- array(0, maxpathlength)
+	vec[1:min(2, maxpathlength)] <- thresh ^ c(1:min(2, maxpathlength))
+	# fac <- factorial(n - 2)
+	for(i in 3:maxpathlength)
+	{
+		vec[i] <- prod((n - c(2:(i-1))) * thresh) * thresh^2 
+	}
+	dat <- data.frame(k = 1:maxpathlength, fdr = vec)
+	return(dat)
+}
+
+
+permute_matrix_diag <- function(mat)
+{
+	n <- nrow(mat)
+	d <- n * (0:(n-1)) + 1:n
+	dat <- data.frame(
+		orig = 1:n^2,
+		new = sample(1:n^2, replace=FALSE)
+	)
+	index1 <- which(dat$new %in% d)
+	dat$new[index1] <- dat$new[d]
+	di <- diag(mat)
+	mat <- matrix(mat[dat$new], n, n)
+	diag(mat) <- di
+	return(mat)
+}
+
+
+permute_matrix <- function(mat)
+{
+	return(matrix(mat[sample(1:length(mat))], nrow(mat)))
+}

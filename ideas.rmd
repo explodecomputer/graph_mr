@@ -450,6 +450,7 @@ The false discovery rate is estimated as follows. For a graph where a path of 1 
 
 ```{r}
 L <- list()
+
 nsim <- 100
 for(n in 3:6)
 {
@@ -474,7 +475,7 @@ for(n in 3:6)
 A <- bind_rows(L)
 ```
 
-The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta ~ N(0,1)$. 
+The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta \sim N(0,1)$. 
 
 
 ```{r, fig.cap="Statistical power comparison between standard MR and graph MR using inversion method. Top graph shows the results from simulations where causal influences were simulated with non-zero effect sizes. Bottom graph shows depicts the false discovery rate, i.e. the same simulation but where all effect sizes are 0." }
@@ -482,11 +483,11 @@ The simulation was performed using 5000 samples, and the simulated direct effect
 AA <- gather(A, key='strategy', value='pval', V1, V2)
 AA$strategy <- as.factor(AA$strategy)
 levels(AA$strategy) <- c("Total effect", "Chained direct effects")
-AAg <- AA %>% group_by(n, model, strategy) %>% summarise(propsig = sum(pval < 0.05))
+AAg <- AA %>% group_by(n, model, strategy) %>% summarise(propsig = sum(pval < 0.05)/n())
 ggplot(AAg, aes(x=as.factor(n), y=propsig)) +
 geom_bar(stat="identity", aes(fill=strategy), position="dodge") +
 facet_grid(model ~ .) +
-labs(y=paste0("Number of simulations (out of ", nsim, ") with p < 0.05"), x="Graph size (e.g. number of traits from 1 to n)")
+labs(y=paste0("Prop. simulations (out of ", nsim, ") with p < 0.05"), x="Graph size (e.g. number of traits from 1 to n)")
 ```
 
 Here it is apparent that as the causal chain grows larger the statistical power of the second strategy, which uses the direct effects estimated from the graph, becomes substantially more powerful than the standard approach of identifying the total causal effect. The false discovery rate of the second strategy appears grow as the graph size grows also though.
@@ -511,6 +512,7 @@ There are three causal models being evaluated.
 
 nsim <- 100
 
+
 l <- list()
 n <- 6
 for(j in 1:nsim)
@@ -527,7 +529,6 @@ for(j in 1:nsim)
 lpos <- as.data.frame(do.call(rbind, l))
 lpos$what <- rep(c("Non-null", "Null"), times=nsim)
 lpos$model <- "Model1"
-
 
 l <- list()
 for(j in 1:nsim)
@@ -568,7 +569,6 @@ l3path <- as.data.frame(do.call(rbind, l))
 l3path$what <- rep(c("Non-null", "Null"), times=nsim)
 l3path$model <- "Model3"
 
-
 l <- list()
 for(j in 1:nsim)
 {
@@ -578,15 +578,14 @@ for(j in 1:nsim)
 	l[[j]] <- test_sig(res1, res1b, 0.01)
 }
 lneg <- as.data.frame(do.call(rbind, l))
-lneg$what <- "neg"
-lneg$model <- "Null"
-
+lneg$what <- "Null"
+lneg$model <- "No effects"
 
 B <- bind_rows(list(lpos, l2path, l3path, lneg))
 
 ```
 
-The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta ~ N(0,1)$.
+The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta \sim N(0,1)$.
 
 To generate a basic FDR, a different dataset was generated with no simulated causal paths. A graph traversal algorithm is applied to find a path of significant links to make a chain from 1 to 6. This is not constrained to go through 2,3,4,5, it can go through any path to get from 1 to 6. 
 
@@ -597,12 +596,13 @@ BB <- gather(B, key='strategy', value='pval', V1, V2)
 AA$strategy <- as.factor(AA$strategy)
 levels(AA$strategy) <- c("Total effect", "Chained direct effects")
 
+
 BBg <- BB %>% group_by(what, model, strategy) %>% summarise(propsig = sum(pval < 0.01) / n())
 
 ggplot(BBg, aes(x=as.factor(model), y=propsig)) +
 geom_bar(stat="identity", aes(fill=strategy), position="dodge") +
 facet_grid(what ~ .) +
-labs(y=paste0("Number of simulations (out of ", nsim, ") with p < 0.05"), x="Graph size (e.g. number of traits from 1 to n)")
+labs(y=paste0("Prop. simulations (out of ", nsim, ") with p < 0.05"), x="Graph size (e.g. number of traits from 1 to n)")
 
 ```
 
@@ -618,58 +618,56 @@ $$
 and the probability of a false discovery for a path of length $k$ is $\alpha^k$ where $\alpha$ here is 0.05. Hence, the probability of finding a path between two nodes is
 
 $$
-FDR(i,j) = \alpha + \sum^n_{k=2} \alpha^k \frac{(n - 2)!}{(n - k)!}
+FDR_{n} = \alpha + \sum^n_{k=2} \alpha^k \frac{(n - 2)!}{(n - k)!}
 $$
 
-this can be simplified to be computationally tractable for large graphs and has the following relationship with growing graph sizes
+this can be simplified to be computationally tractable for large graphs. The FDR for a particular path length $K$ is
 
-```{r}
+$$
+\begin{aligned}
+FDR_{n}(K) & = \alpha^K \prod^K_{k=2} n - k - 1 \\
+           & = \alpha^2 \prod^K_{k=2} \alpha(n - k - 1)
+\end{aligned}
+$$
 
-calc_number_of_paths <- function(n, thresh, maxpathlength = n)
-{
-	stopifnot(n >= 3)
-	stopifnot(maxpathlength >= 1 & maxpathlength <= n)
-	vec <- array(0, maxpathlength)
-	vec[1:min(2, maxpathlength)] <- 1
-	# fac <- factorial(n - 2)
-	for(i in 3:maxpathlength)
-	{
-		# vec[i] <- fac / factorial(n - i)
-		# print(fac / factorial(n - i))
-		vec[i] <- prod(n - c(2:(i-1)))
-		# print(prod(n - c(2:(i-1))))
-	}
+Hence, the total FDR across all path lengths is
 
 
-	p <- thresh ^ c(1:maxpathlength)
-	dat <- data.frame(k = 1:maxpathlength, npath = vec, p = p, fdr = vec * p)
-	return(dat)
-}
+$$
+FDR_{n} = \alpha + \alpha^2 + \sum^N_{K=3} \left( \alpha^2 \prod^K_{k=2} \alpha(n - k - 1) \right )
+$$
+
+The effect of graph size on the FDR is shown in the top plot of Figure X. This is what happens if any path size is allowed to be searched for. If the maximum path size is limited to 6 (bottom graph) then the saturation is lower.
+
+```{r, fig.cap="Relationship between graph size, alpha value and FDR"}
 
 l <- list()
-param <- expand.grid(n = 3:300, thresh=c(0.05, 0.04, 0.03, 0.02, 0.01))
+param <- expand.grid(n = 3:300, thresh=c(0.05, 0.025, 0.01, 0.005, 0.001), maxchain=c("Max path size = N", "Max path size = 6"))
+param$maxchainl <- param$n
+param$maxchainl[param$maxchain == "Max path size = 6"] <- 6
 for(i in 1:nrow(param))
 {
-	l[[i]] <- calc_number_of_paths(param$n[i], param$thresh[i], min(param$n[i]))
+	l[[i]] <- calc_number_of_paths(param$n[i], param$thresh[i], min(param$maxchainl[i], param$n[i]))
 	l[[i]]$n <- param$n[i]
 	l[[i]]$thresh <- param$thresh[i]
+	l[[i]]$maxc <- param$maxchain[i]
 }
 
 
 l <- bind_rows(l)
-
-l1 <- group_by(l, n, thresh) %>%
+l1 <- group_by(l, n, thresh, maxc) %>%
 	summarise(fdr=pmin(1, sum(fdr)))
 
 ggplot(l1, aes(x=n, y=fdr)) +
-geom_point(aes(colour=as.factor(thresh))) +
+# geom_point(aes(colour=as.factor(thresh))) +
 geom_line(aes(colour=as.factor(thresh))) +
+facet_grid(maxc ~ .) +
 labs(x="Number of traits in graph", y="False discovery rate for finding a path between any two nodes", colour="Threshold for\nsignificant\nlink in path")
 
 ```
 
 
-What does this look like e.g. for 50 trait graph with $\alpha = 0.05$?
+What does this saturation look like e.g. for 50 trait graph with $\alpha = 0.05$?
 
 ```{r}
 
@@ -679,6 +677,64 @@ geom_point(aes(colour=as.factor(n))) +
 geom_line(aes(colour=as.factor(n))) +
 facet_wrap(~ n, scale="free") +
 labs(x="Chain length", y="FDR, not limited to 1", colour="Graph size")
+
+```
+
+
+An alternative way to check significance of a path is to permute. Here the off diagonal elements of the matrix of p-values are permuted, preserving the diagonal elements. 
+
+
+```{r}
+
+
+get_empirical_pval <- function(res, thresh, from, to, nboot=1000)
+{
+	mat <- t(res)
+	p <- find_path(t(res1b$pval), thresh, from, to)
+	out <- rep(0, nboot)
+	for(i in 1:nboot)
+	{
+		# out[i] <- find_path(permute_matrix_diag(mat), thresh, from, to)
+		out[i] <- find_path(permute_matrix(mat), thresh, from, to)
+	}
+	return(sum(p > out) / nboot )
+}
+
+param <- expand.grid(
+	n = c(6, 10, 20),
+	nsim = 1:50,
+	thresh = c(0.05, 0.01, 0.001)
+)
+
+for(i in 1:nrow(param))
+{
+	message(i, " of ", nrow(param))
+	dat1 <- init_dat(5000, param$n[i])
+	dat1 <- make_edge(1,2,rnorm(1)/6,dat1)
+	dat1 <- make_edge(2,6,rnorm(1)/6,dat1)
+	dat1 <- make_edge(1,3,rnorm(1)/6,dat1)
+	dat1 <- make_edge(3,6,rnorm(1)/6,dat1)
+	dat1 <- make_edge(1,4,rnorm(1)/6,dat1)
+	dat1 <- make_edge(4,5,rnorm(1)/6,dat1)
+	dat1 <- make_edge(5,6,rnorm(1)/6,dat1)
+	res1 <- graph_mr(dat1)
+	res1b <- bootstrap_graphs(res1)
+
+	# path from 1-6?
+	param$pval[i] <- find_path(t(res1b$pval), param$thresh[i], 1, 6)
+	param$emp_pval[i] <- get_empirical_pval(res1b$pval, param$thresh[i], 1, 6)
+}
+
+save(param, file="empirical_pvals.rdata")
+
+```
+
+```{r}
+
+ggplot(subset(param, thresh < 0.05), aes(x=as.factor(n), y=emp_pval)) +
+geom_boxplot(aes(fill=as.factor(thresh))) +
+labs(x="Graph size", y="Empirical p-value", fill="Link threshold")
+
 
 ```
 
