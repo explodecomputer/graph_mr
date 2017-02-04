@@ -445,7 +445,7 @@ Strategy (2) entails finding a 'significant' p-value at each of the 5 direct rel
 
 A significant path is found for a hypothesised relationsip of 1 causing 6 as follows. A directed path is searched for that links the two nodes along edges that all have p < 0.01. If any edge doesn't satisfy this threshold then another path needs to be found. This uses a graph traversal algorithm (breadth first search of Dijkstra's algorithm). This means that some paths from 1 to 6 might be found *through the wrong pathway*. But the extent to which this is happening is evaluated in the false discovery rate.
 
-The false discovery rate is estimated as follows. For a graph where a path of 1 causing 6 is simulated, paths are searched for that link **6 causing 1**, i.e. the reverse, for which there should be no paths.
+The false discovery rate is estimated as follows. For a graph where a path of 1 causing 6 is simulated, paths are searched for that link **6 causing 5**, i.e. the reverse, for which there should be no paths. This is attempting to be conservative because a) it allows for strong edges to exist in the null model, b) the target node is known to be influenced by at least one other node already.
 
 
 ```{r}
@@ -681,24 +681,10 @@ labs(x="Chain length", y="FDR, not limited to 1", colour="Graph size")
 ```
 
 
-An alternative way to check significance of a path is to permute. Here the off diagonal elements of the matrix of p-values are permuted, preserving the diagonal elements. 
+An alternative way to check significance of a path is to permute. Here the off diagonal elements of the matrix of p-values are permuted. What this entails is that the same number of strong edges are retained, and then the question is 'with this number of strong edges amongst all nodes, how likely is it to find a path from A to B?'
 
 
-```{r}
-
-
-get_empirical_pval <- function(res, thresh, from, to, nboot=1000)
-{
-	mat <- t(res)
-	p <- find_path(t(res1b$pval), thresh, from, to)
-	out <- rep(0, nboot)
-	for(i in 1:nboot)
-	{
-		# out[i] <- find_path(permute_matrix_diag(mat), thresh, from, to)
-		out[i] <- find_path(permute_matrix(mat), thresh, from, to)
-	}
-	return(sum(p > out) / nboot )
-}
+```{r, eval=FALSE}
 
 param <- expand.grid(
 	n = c(6, 10, 20),
@@ -731,6 +717,7 @@ save(param, file="empirical_pvals.rdata")
 
 ```{r}
 
+load("empirical_pvals.rdata")
 ggplot(subset(param, thresh < 0.05), aes(x=as.factor(n), y=emp_pval)) +
 geom_boxplot(aes(fill=as.factor(thresh))) +
 labs(x="Graph size", y="Empirical p-value", fill="Link threshold")
@@ -738,8 +725,31 @@ labs(x="Graph size", y="Empirical p-value", fill="Link threshold")
 
 ```
 
-- Does not account for sparse graphs that have known number of significant edges - that would make it graph specific.
-- Limit the possible chain length for a significant
+This looks to be a much more conservative way to test the significance of the link between two nodes. 
+
+
+
+### Cycles (non-DAGs)
+
+This looks problematic
+
+```{r }
+
+dat <- init_dat(500000, 3)
+dat <- make_edge(1,2,2, dat)
+dat <- make_edge(2,3,3, dat)
+dat <- make_edge(3,1,7, dat)
+
+dat <- make_edge(4,5,4, dat)
+dat <- make_edge(5,3,3, dat)
+
+res <- graph_mr(dat)
+res1 <- mediation_method(res)
+res2 <- inversion_method(res)
+res3 <- deconvolution_method(res)
+
+```
+
 
 
 ## Discussion

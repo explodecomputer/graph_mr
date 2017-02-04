@@ -312,3 +312,17 @@ permute_matrix <- function(mat)
 {
 	return(matrix(mat[sample(1:length(mat))], nrow(mat)))
 }
+
+
+get_empirical_pval <- function(res, thresh, from, to, nboot=1000)
+{
+	mat <- t(res)
+	p <- find_path(t(res1b$pval), thresh, from, to)
+	out <- rep(0, nboot)
+	for(i in 1:nboot)
+	{
+		# out[i] <- find_path(permute_matrix_diag(mat), thresh, from, to)
+		out[i] <- find_path(permute_matrix(mat), thresh, from, to)
+	}
+	return(sum(p > out) / nboot )
+}
