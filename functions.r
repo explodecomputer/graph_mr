@@ -183,7 +183,8 @@ plot_from_matrix <- function(mat, title="")
 	diag(mat) <- 0
 	net <- graph.adjacency(round(t(mat), 1), weighted=TRUE, mode="directed")
 	# E(net)$width <- E(net)$weight
-	plot(net, edge.label = E(net)$weight, main=title)
+	layout=layout.circle(net)
+	plot(net, edge.label = E(net)$weight, main=title, layout=layout)
 }
 
 

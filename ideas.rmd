@@ -28,7 +28,7 @@ set.seed(1234)
 
 ## Summary
 
-Suppose we have complete summary statistics for an arbitrary number of traits, and each trait has valid instruments. Mendelian randomisation can be used to calculate the causal relationships of $M \times M$ pairs of traits, thereby constructing a matrix of *total* effects of each trait on each of the other traits. This paper introduces a method to deconvolve this matrix to obtain the set of all direct causal effects between the traits. It goes on to show that the statistical power of identifying causal relationships between traits improves substantially by chaining together the direct effects on the deconvolved pathway, when compared to evaluating the total effect as is typical in Mendelian randomisation.
+Suppose we have complete summary statistics for an arbitrary number of traits, and each trait has valid instruments. Two-sample Mendelian randomisation can be used to calculate the causal relationships of $M \times M$ pairs of traits, thereby constructing a matrix of *total* effects of each trait on each of the other traits. This paper introduces a method to deconvolve this matrix to obtain the set of all direct causal effects between the traits without the use of individual level data. It goes on to show that the statistical power of identifying causal relationships between traits improves substantially by chaining together the direct effects on the deconvolved pathway, when compared to evaluating the total effect as is typical in Mendelian randomisation.
 
 
 ## Introduction
@@ -107,7 +107,7 @@ and this is performed for each of the $5 \times 5$ possible pairwise combination
 
 
 
-```{r, fig.cap="Simulated causal relationships"}
+```{r }
 
 dat1 <- init_dat(500000, 5)
 dat1 <- make_edge(1, 2, -1, dat1)
@@ -122,7 +122,9 @@ round(res1$b, 1)
 into a matrix of direct relationships, $R_{d}$ e.g.
 
 ```{r }
-dat1$r
+
+round(inversion_method(res1))
+
 ```
 
 There are two potential drawbacks with the MR for mediation approach. First, the combinatorial increase in the number of terms that are required for calculating the direct effects gets large very quickly. For example, for a graph with 10 variables there are 52 unique paths for each of the 100 elements in the matrix, and identifying those paths itself is a computationally slow process. Second, perhaps more importantly, this method may not actually generalise beyond the three-trait case.
@@ -234,7 +236,6 @@ facet_wrap(~ method, scale="free") +
 labs(x="True (simulated) direct effects", y="Estimated effects for each method")
 
 ```
-
 
 #### Further simulations
 
@@ -431,6 +432,61 @@ labs(x="True (simulated) direct effects", y="Estimated effects for each method")
 
 ```
 
+\newpage
+
+## Empirical example
+
+As an illustration, the inversion method was performed on the following variables using the data in MR-Base:
+
+- Body mass index
+- Coronary heart disease
+- Type 1 diabetes
+- Type 2 diabetes
+- Serum urate
+- LDL cholesterol
+
+```{r }
+load("empirical_analysis.rdata")
+```
+
+Instruments were extracted for each trait (`r nrow(exposure_dat)` in total), and each of those instruments was extracted from each trait, thus enabling a 2-sample MR analysis of each trait against each of the other traits. 
+
+In order to automatically choose the most reliable MR estimate for each of the $6 \times 6$ analyses, the meta-analytic framework described by [@Rucker2011] and adapted to MR by [@Bowden2017] was used. Briefly, this entails:
+
+- No heterogeneity, no directional pleiotropy - **IVW (fixed effects)**
+- Heterogeneity, no directional pleiotropy - **IVW (multiplicative random effects)**
+- No heterogeneity, directional pleiotropy - **MR Egger (fixed effects)**
+- Heterogeneity, directional pleiotropy - **MR Egger (multiplicative random effects)**
+
+This was applied without close scrutiny for illustrative purposes, but further refinement to this procedure is possible.
+
+Showing associations with $p < 0.05$, the graph in Figure 10 shows the nominally significant edges for the raw associations. The deconvolved graph is shown in Figure 11.
+
+```{r fig.cap="Empirical results, raw graph"}
+
+plot_from_matrix2 <- function(mat, title="")
+{
+	diag(mat) <- 0
+	net <- graph.adjacency(round(t(mat), 1), weighted=TRUE, mode="directed")
+	# E(net)$width <- E(net)$weight
+	layout=layout.circle(net)
+	plot(net, edge.label = E(net)$weight, main=title, layout=layout)
+}
+
+pl2 <- resr$b
+pl2[resr$pval > 0.05] <- 0
+plot_from_matrix2(pl2, "Raw")
+
+```
+
+```{r fig.cap="Empirical results, deconvolved graph"}
+pl1 <- resb$b
+pl1[resb$pval > 0.01] <- 0
+plot_from_matrix2(pl1, "Deconvolved")
+
+```
+
+\newpage
 
 ## Statistical power
 
@@ -475,7 +531,7 @@ for(n in 3:6)
 A <- bind_rows(L)
 ```
 
-The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta \sim N(0,1)$. 
+The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta \sim N(0,1)$. The results are shown in Figure 12.
 
 
 ```{r, fig.cap="Statistical power comparison between standard MR and graph MR using inversion method. Top graph shows the results from simulations where causal influences were simulated with non-zero effect sizes. Bottom graph shows depicts the false discovery rate, i.e. the same simulation but where all effect sizes are 0." }
@@ -587,7 +643,7 @@ B <- bind_rows(list(lpos, l2path, l3path, lneg))
 
 The simulation was performed using 5000 samples, and the simulated direct effect sizes for each chain were sampled from $\beta \sim N(0,1)$.
 
-To generate a basic FDR, a different dataset was generated with no simulated causal paths. A graph traversal algorithm is applied to find a path of significant links to make a chain from 1 to 6. This is not constrained to go through 2,3,4,5, it can go through any path to get from 1 to 6. 
+To generate a basic FDR, a different dataset was generated with no simulated causal paths. A graph traversal algorithm is applied to find a path of significant links to make a chain from 1 to 6. This is not constrained to go through 2,3,4,5, it can go through any path to get from 1 to 6. Results from these extended simulations are shown in Figure 13.
 
 
 ```{r, fig.cap="Statistical power comparison between standard MR and graph MR using inversion method. Top graph shows the results from simulations where causal influences were simulated with non-zero effect sizes. Bottom graph shows depicts the false discovery rate, i.e. the same simulation but where all effect sizes are 0." }
@@ -637,7 +693,7 @@ $$
 FDR_{n} = \alpha + \alpha^2 + \sum^N_{K=3} \left( \alpha^2 \prod^K_{k=2} \alpha(n - k - 1) \right )
 $$
 
-The effect of graph size on the FDR is shown in the top plot of Figure X. This is what happens if any path size is allowed to be searched for. If the maximum path size is limited to 6 (bottom graph) then the saturation is lower.
+The effect of graph size on the FDR is shown in the top plot of Figure 14. This is what happens if any path size is allowed to be searched for. If the maximum path size is limited to 6 (bottom graph) then the saturation is lower.
 
 ```{r, fig.cap="Relationship between graph size, alpha value and FDR"}
 
@@ -667,9 +723,9 @@ labs(x="Number of traits in graph", y="False discovery rate for finding a path b
 ```
 
 
-What does this saturation look like e.g. for 50 trait graph with $\alpha = 0.05$?
+What does this saturation look like e.g. for 50 trait graph with $\alpha = 0.05$? This is shown in Figure 15.
 
-```{r}
+```{r, fig.cap="Identifying which path lengths contribute most to elevating false discovery rates"}
 
 m <- subset(l, n %in% c(20, 40, 60, 80, 100) & thresh == 0.05)
 ggplot(m, aes(x=k, y=fdr)) +
@@ -681,7 +737,7 @@ labs(x="Chain length", y="FDR, not limited to 1", colour="Graph size")
 ```
 
 
-An alternative way to check significance of a path is to permute. Here the off diagonal elements of the matrix of p-values are permuted. What this entails is that the same number of strong edges are retained, and then the question is 'with this number of strong edges amongst all nodes, how likely is it to find a path from A to B?'
+An alternative way to check significance of a path is to permute. Here the off-diagonal elements of the matrix of p-values are permuted. What this entails is that the same number of strong edges are retained, and then the question is 'with this number of strong edges amongst all nodes, how likely is it to find a path from A to B?' Results are shown in Figure 16.
 
 
 ```{r, eval=FALSE}
@@ -715,7 +771,7 @@ save(param, file="empirical_pvals.rdata")
 
 ```
 
-```{r}
+```{r, fig.cap="P-value distributions from permutation analysis"}
 
 load("empirical_pvals.rdata")
 ggplot(subset(param, thresh < 0.05), aes(x=as.factor(n), y=emp_pval)) +
@@ -733,7 +789,7 @@ This looks to be a much more conservative way to test the significance of the li
 
 This looks problematic
 
-```{r }
+```{r, eval=FALSE }
 
 dat <- init_dat(500000, 3)
 dat <- make_edge(1,2,2, dat)
@@ -760,7 +816,7 @@ The inversion method appears to be reasonably accurate in a range of scenarios, 
 Issues:
 
 - The mediation method might be interpreted too simplisticly here. I think there needs to be recursion beyond the 3 variable example - i.e. the direct effects are a function of indirect effects at the moment, but these indirect effects probably need to be reduced to direct effects also. This would require identifying a path through which to traverse the graph and recursively estimate the direct effects
-- These simulations only looked at relatively sparse graphs, and with no loops.
+- These simulations only looked at relatively sparse graphs
 - Need to evaluate much larger graphs, e.g. thousands of traits
 - Why isn't the Feizi method working? Need to make sure it works for symmetric correlation graphs
 - Haven't evaluated the influence of cycles in the graph - this is hard to simulate, though if a temporal component were introduced then there will be no cycles.
