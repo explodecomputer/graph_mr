@@ -3,8 +3,7 @@ title: Constructing deconvolved causal graphs from GWAS summary data
 author: G Hemani et al
 date: "`r Sys.Date()`"
 output: 
-  pdf_document:
-    keep_tex: true
+  word_document
 bibliography: ideas.bib
 csl: nature.csl
 ---
