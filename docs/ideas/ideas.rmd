@@ -16,8 +16,8 @@ csl: nature.csl
 
 suppressPackageStartupMessages(library(knitr))
 
-read_chunk("functions.r")
-source("functions.r")
+read_chunk("../../scripts/functions.r")
+source("../../scripts/functions.r")
 opts_chunk$set(warning=FALSE, message=FALSE, cache=TRUE, echo=FALSE)
 set.seed(1234)
 
@@ -331,7 +331,7 @@ Issues:
 
 
 
-![Deconvolving causal estimates from raw MR estimates. a) For each trait that can be instrumented, perform MR of its effect against every other trait. e.g. If there are six traits then there are 6^2 - 6 = 30 MR estimates to generate. b) Use these results to construct the matrix of total effects. c) Use a deconvolution method to obtain a set of direct causal effects. d and e) The true causal model is shown in (e), but if the raw causal effects are estimated using MR (i.e. the *total* effects) then a number of extra paths will be identified owing to transitive effects of the direct paths.](schematic-01.png)
+![Deconvolving causal estimates from raw MR estimates. a) For each trait that can be instrumented, perform MR of its effect against every other trait. e.g. If there are six traits then there are 6^2 - 6 = 30 MR estimates to generate. b) Use these results to construct the matrix of total effects. c) Use a deconvolution method to obtain a set of direct causal effects. d and e) The true causal model is shown in (e), but if the raw causal effects are estimated using MR (i.e. the *total* effects) then a number of extra paths will be identified owing to transitive effects of the direct paths.](../../images/schematic-01.png)
 
 
 
@@ -566,7 +566,7 @@ labs(x="True (simulated) direct effects", y="Estimated effects for each method")
 ```
 
 ```{r }
-load("empirical_analysis.rdata")
+load("../../data/empirical_analysis.rdata")
 ```
 
 
@@ -798,7 +798,7 @@ save(param, file="empirical_pvals.rdata")
 
 ```{r, fig.cap="P-value distributions from permutation analysis"}
 
-load("empirical_pvals.rdata")
+load("../../data/empirical_pvals.rdata")
 ggplot(subset(param, thresh < 0.05), aes(x=as.factor(n), y=emp_pval)) +
 geom_boxplot(aes(fill=as.factor(thresh))) +
 labs(x="Graph size", y="Empirical p-value", fill="Link threshold")

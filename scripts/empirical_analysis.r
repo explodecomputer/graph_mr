@@ -46,7 +46,7 @@ rownames(resr$se) <- colnames(resr$se)
 rownames(resr$pval) <- colnames(resr$pval)
 resb <- bootstrap_graphs(resr)
 
-save(exposure_dat, outcome_dat, dat, out, resr, resb, file="empirical_analysis.rdata")
+save(exposure_dat, outcome_dat, dat, out, resr, resb, file="../data/empirical_analysis.rdata")
 
 
 par(mfrow=c(1,2))
