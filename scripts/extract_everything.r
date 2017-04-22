@@ -30,8 +30,9 @@ m <- list()
 for(i in 1:nrow(traits))
 {
     message(i, " of ", nrow(traits))
-    l[[i]] <- try(extract_instruments(traits$id[i]))
+    l[[i]] <- try(extract_instruments(traits$id[i], p1=5e-6))
     m[[i]] <- try(extract_outcome_data(l[[i]]$SNP, traits$id))
 }
 
-exposure_dat <- dplyr::bind_rows(l)
+save(l, m, file="extract_everything.rdata")
+
