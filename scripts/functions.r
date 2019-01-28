@@ -1,13 +1,15 @@
-suppressPackageStartupMessages(library(tidyr))
-suppressPackageStartupMessages(library(ggplot2))
-suppressPackageStartupMessages(library(dplyr))
-suppressPackageStartupMessages(library(igraph))
-suppressPackageStartupMessages(library(gtools))
-suppressPackageStartupMessages(library(gridExtra))
-suppressPackageStartupMessages(library(network))
-suppressPackageStartupMessages(library(sna))
-suppressPackageStartupMessages(library(ggnetwork))
-suppressPackageStartupMessages(library(igraph))
+suppressPackageStartupMessages(suppressWarnings({
+	library(tidyr)
+	library(ggplot2)
+	library(dplyr)
+	library(igraph)
+	library(gtools)
+	library(gridExtra)
+	library(network)
+	library(sna)
+	library(ggnetwork)
+	library(igraph)
+}))
 
 fastAssoc <- function(y, x)
 {
@@ -173,6 +175,7 @@ mediation_method <- function(res)
 deconvolution_method <- function(res)
 {
 	mat <- res$b
+	diag(mat) <- 0
 	out <- mat %*% solve(diag(nrow(mat)) + mat)
 	return(out)
 }

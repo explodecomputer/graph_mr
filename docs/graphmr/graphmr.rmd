@@ -3,18 +3,20 @@ title: Constructing deconvolved causal graphs from GWAS summary data
 author: G Hemani et al
 date: "`r Sys.Date()`"
 output: 
-  word_document
-bibliography: ideas.bib
+  pdf_document
+bibliography: graphmr.bib
 csl: nature.csl
 ---
 
 
-```{r, echo=FALSE, cache=FALSE}
+```{r, echo=FALSE, cache=TRUE}
 
 # http://www.mathpages.com/home/kmath198/2-1/2-1.htm
 # http://videolectures.net/gpip06_mackay_gpb/
 
-suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(suppressWarnings({
+	library(knitr)
+}))
 
 read_chunk("../../scripts/functions.r")
 source("../../scripts/functions.r")
@@ -159,6 +161,8 @@ $$
 R_{d} = R_{t}(I + R_{t})^{-1}
 $$
 
+The diagonal elements for $R_{t}$ need to be set to 0 for this method.
+
 ### Standard errors
 
 Bootstrapping is used to obtain the standard errors of the direct effects for the inversion method. Each element in $R_{t}$ is resampled with $R_{t}(i,j)* \sim N(R_{t}(i,j), se(R_{t}(i,j)))$. The inversion method is then applied to the resampled matrix $R_{t}*$ and the results $R_{d}*$ are stored. This is performed 1000 times to obtain a distribution of effects for each element of the $R_{d}$ matrix. The standard deviation of the distribution from each element is taken to be the standard error of that direct effect estimate. 
@@ -177,9 +181,7 @@ Here will be presented analysis of four different causal networks. In all cases,
 #### Illustrative example
 
 
-In each of the following cases large samples (n=500000) are simulated and causal effect sizes are large, to ensure that power is not influencing the fidelity of matrix deconvolution by the different methods. An illustrative example with the causal structure between four traits is shown in Figure 2. In this simple case, all methods resolve the same graph, however only the mediation and inversion methods obtain good agreement between the deconvolved direct effect estimates and the simulated direct effects (Figure 3).
-
-The Feizi method appears to generate estimates proportional to the raw total effects, but on a scale that is shrunk towards 0.
+In each of the following cases large samples (n=500000) are simulated and causal effect sizes are large, to ensure that power is not influencing the fidelity of matrix deconvolution by the different methods. An illustrative example with the causal structure between four traits is shown in Figure 2. In this simple case, all methods resolve the same graph with good agreement between the deconvolved direct effect estimates and the simulated direct effects (Figure 3).
 
 
 #### Further simulations
@@ -188,7 +190,7 @@ Further simulations of more complex graphs are now performed. Beyond 7 variables
 
 The models tested are shown in Figures 4-8. There is a mixture of different numbers of variables, different model complexities, and simulating effect sizes from non-guassian distributions. A comparison of the deconvolved effect estimates from each of these models against the true simulated effects is shown in Figure 9.
 
-The inversion method performs reliably in most cases, however occasionally in more complex models there will appear to be some direct effects that have non-zero estimates where they should have had no effect. This may be an indication of saturation.
+The inversion and Feizi methods perform reliably in most cases, however occasionally in more complex models there will appear to be some direct effects that have non-zero estimates where they should have had no effect. This may be an indication of saturation. Sometimes it looks like the Feizi method is resolving the structure better than the inversion method.
 
 
 ## Empirical example
@@ -348,6 +350,7 @@ res <- graph_mr(dat)
 res1 <- mediation_method(res)
 res2 <- inversion_method(res)
 res3 <- deconvolution_method(res)
+diag(dat$r) <- NA
 resall <- rbind(
 	data.frame(estimate=c(res1), truth=c(dat$r), method="Mediation"),
 	data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion"),
@@ -394,6 +397,7 @@ res <- graph_mr(dat)
 res1 <- mediation_method(res)
 res2 <- inversion_method(res)
 res3 <- deconvolution_method(res)
+diag(dat$r) <- NA
 l[[1]] <- rbind(
 	data.frame(estimate=c(res1), truth=c(dat$r), method="Mediation"),
 	data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion"),
@@ -462,7 +466,7 @@ for(i in 1:(p-1))
 res <- graph_mr(dat)
 res2 <- inversion_method(res)
 res3 <- deconvolution_method(res)
-
+diag(dat$r) <- NA
 l[[3]] <- rbind(
 	data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion"),
 	data.frame(estimate=c(res3), truth=c(dat$r), method="Feizi"),
@@ -499,7 +503,7 @@ dat <- make_edge(1,8,rnorm(1), dat)
 res <- graph_mr(dat)
 res2 <- inversion_method(res)
 res3 <- deconvolution_method(res)
-
+diag(dat$r) <- NA
 l[[4]] <- rbind(
 	data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion"),
 	data.frame(estimate=c(res3), truth=c(dat$r), method="Feizi"),
@@ -533,7 +537,7 @@ for(i in 1:(p-1))
 res <- graph_mr(dat)
 res2 <- inversion_method(res)
 res3 <- deconvolution_method(res)
-
+diag(dat$r) <- NA
 l[[5]] <- rbind(
 	data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion"),
 	data.frame(estimate=c(res3), truth=c(dat$r), method="Feizi"),
