@@ -21,3 +21,10 @@ Rscript -e "rmarkdown::render('graphmr.rmd', output_format='all')"
 - Evaluate sensitivity to biases in the MR matrix
 - Compare to multivariable MR
 
+
+## Thesis should ideally include
+
+- Explaining background / context / why it's useful
+- Simulations
+- Theory
+- Application
