@@ -559,7 +559,7 @@ plot_Data <- function(average_auc, n_size, sparse){
     "bottomright",
     inset = c(0.3 , 0),
     c("Inversion method","Feizi method","ND Correlation Method"),
-    col = c(2,3,4),
+    col = c(5,2,3),
     lty = 1,
     bty = "n",
     y.intersp = 1.5
@@ -570,19 +570,19 @@ plot_Data <- function(average_auc, n_size, sparse){
   Bplt <- ggplot(subset(df,Col %in% c('B')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='red')) +
     stat_summary(geom="ribbon", fun.ymin="min", fun.ymax="max",fill='red', aes(x=sdsp,y=Aucsd), alpha=0.1) +
     theme_bw() + 
-    coord_cartesian(xlim =p_values, ylim = c(0.5, 1)) +
+    coord_cartesian(xlim =c(min(p_values),max(p_values)), ylim = c(0.5, 1)) +
     labs(x = "% Available Subgraph", y='AUC') +
     theme(legend.position = "none")
   Cplt <- ggplot(subset(df,Col %in% c('C')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='green')) +
     stat_summary(geom="ribbon", fun.ymin="min", fun.ymax="max",fill='green', aes(x=sdsp,y=Aucsd), alpha=0.1) +
     theme_bw() + 
-    coord_cartesian(xlim =p_values, ylim = c(0.5, 1)) +
+    coord_cartesian(xlim =c(min(p_values),max(p_values)), ylim = c(0.5, 1)) +
     labs(x = "% Available Subgraph", y='AUC') +
     theme(legend.position = "none")
   Dplt <- ggplot(subset(df,Col %in% c('D')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='blue')) +
     stat_summary(geom="ribbon", fun.ymin="min", fun.ymax="max", fill='blue',aes(x=sdsp,y=Aucsd), alpha=0.1) +
     theme_bw() + 
-    coord_cartesian(xlim =p_values, ylim = c(0.5, 1)) +
+    coord_cartesian(xlim =c(min(p_values),max(p_values)), ylim = c(0.5, 1)) +
     labs(x = "% Available Subgraph", y='AUC') +
     theme(legend.position = "none")
   
@@ -599,7 +599,6 @@ run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity=0)
     dis <- do_test(iter, i, 2000, 0, 0, 0, edgeset=i,broken=broke,sparsity=sparsity)
     #print(head(dis))
     plot_Data(dis, i,FALSE)
-    print("here!")
   }
   print("Done")
   
@@ -628,11 +627,4 @@ dat <- init_data(50000,8)
 edg <- cbind(c(1,2),c(1,3),c(1,4),c(2,4),c(2,3))
 #edg <- getRandomDag(5,0.5)
 dat <- single_test(8, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, data = dat, broken=FALSE)
-
-
-
-
-
-
-
 
