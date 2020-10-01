@@ -100,21 +100,26 @@ generate_edge_set <- function(nodes, nedges=-1){
 
 
 #Takes a n x 2 edgeset and augments the data to represent it
-set_to_edges <- function(set, data, edge=FALSE){
+set_to_edges <- function(set, data, edge=FALSE, cf){
   if (is.null(set) | length(set) < 1){
     return(data)
   }
   l <- ncol(set)
+  
+  
+  # which edges have a confounder
+  conf_ed <- sample(1:l, l * cf, replace=FALSE)
+  conf <- runif(l,min=-2,max=2)
+  
   for (i in 1:l){
     cycle <- set[,i]
+    conf_ef <- conf[i]
     if (edge){
       effect <- runif(1,min=-4,max=4)
       if(effect == 0){
         effect <- 1
       }
-      conf_ef <- runif(1,min=-2,max=2)
-      n=nrow(data)
-      p=ncol(data)
+      #conf_ef <- runif(1,min=-2,max=2)
       data <- make_edge(cycle[[1]],cycle[[2]], effect, data, conf_effect = conf_ef)
     }else{
       for (j in 1:k){
@@ -142,13 +147,13 @@ graph_gen <- function(ncycles, scycle, nedges, data, edgeset = 0){
   nodes <- list(n=c(1:data$p),l=data$p)
   if(length(edgeset)>0){
     if (edgeset != 0){
-      data <- set_to_edges(edgeset, data, TRUE)
+      data <- set_to_edges(edgeset, data, TRUE, 0.5)
     }else{
       # recommended to keep relatively sparse, as edges can accidentally create cycles
       cycles <- generate_cycle_set(nodes, ncycles, scycle=scycle)
       edges <- generate_edge_set(nodes, nedges)
-      if (length(cycles) != 0){data <- set_to_edges(cycles, data)}
-      if (length(edges) != 0){data <- set_to_edges(edges, data, TRUE)}
+      if (length(cycles) != 0){data <- set_to_edges(cycles, data, FALSE, 0.5)}
+      if (length(edges) != 0){data <- set_to_edges(edges, data, TRUE, 0.5)}
     }
   }
   
@@ -613,7 +618,7 @@ run_tests_sparse <- function(nwork, iter, broke=FALSE){
 
 run_tests_subgr(base=9,9,10,broke=FALSE,sparsity=0.5)
 # The largest base size for the simulations to be finished in a reasonable time
-run_tests_subgr(base=5,5,10,broke=FALSE,sparsity=0.5)
+run_tests_subgr(base=10,10,10,broke=FALSE,sparsity=0.5)
 #run_tests_sparse(5,5, broke = TRUE)
 #do_test(4,10,100,0,0,0,edgeset=100,broken=FALSE,sparsity=-1)
 
@@ -627,4 +632,10 @@ dat <- init_data(50000,8)
 edg <- cbind(c(1,2),c(1,3),c(1,4),c(2,4),c(2,3))
 #edg <- getRandomDag(5,0.5)
 dat <- single_test(8, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, data = dat, broken=FALSE)
+
+
+dat <- init_data(50000,100)
+edg <- cbind(c(1,2),c(1,3),c(1,4),c(2,4),c(2,3))
+#edg <- getRandomDag(5,0.5)
+dat <- single_test(100, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, data = dat, broken=FALSE)
 
