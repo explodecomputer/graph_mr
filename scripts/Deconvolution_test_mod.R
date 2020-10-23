@@ -57,12 +57,20 @@ init_data <- function(n, p, pl=0){
 # conf effect is applied to the node level weightings, not the true graph edges
 # conf-r influences both i and j:
 # d_ij = b_g*g_ij + SUM(h_k*d_ik) + e_ij + SUM(U)
-make_edge <- function(i, j, effect, data, conf_effect=0)
+make_edge <- function(i, j, effect, data)
 {
   data$r[j, i] <- effect
   u <- rnorm(nrow(data$d))
+  data$d[,i] <- data$d[,i]
+  data$d[,j] <- data$d[,j] + data$d[,i] * effect
+  return(data)
+}
+
+make_conf <- function(i, j, data, conf_effect=0)
+{
+  u <- rnorm(nrow(data$d))
   data$d[,i] <- data$d[,i]+ u*conf_effect
-  data$d[,j] <- data$d[,j] + data$d[,i] * effect + u*conf_effect
+  data$d[,j] <- data$d[,j] + u*conf_effect
   return(data)
 }
 
@@ -100,27 +108,21 @@ generate_edge_set <- function(nodes, nedges=-1){
 
 
 #Takes a n x 2 edgeset and augments the data to represent it
-set_to_edges <- function(set, data, edge=FALSE, cf){
+set_to_edges <- function(set, conf, data, edge=FALSE){
   if (is.null(set) | length(set) < 1){
     return(data)
   }
   l <- ncol(set)
-  
-  
-  # which edges have a confounder
-  conf_ed <- sample(1:l, l * cf, replace=FALSE)
-  conf <- runif(l,min=-2,max=2)
+  n <- ncol(conf)
   
   for (i in 1:l){
     cycle <- set[,i]
-    conf_ef <- conf[i]
     if (edge){
       effect <- runif(1,min=-4,max=4)
       if(effect == 0){
         effect <- 1
       }
-      #conf_ef <- runif(1,min=-2,max=2)
-      data <- make_edge(cycle[[1]],cycle[[2]], effect, data, conf_effect = conf_ef)
+      data <- make_edge(cycle[[1]],cycle[[2]], effect, data)
     }else{
       for (j in 1:k){
         effect <- runif(1,min=-4,max=4)
@@ -131,29 +133,47 @@ set_to_edges <- function(set, data, edge=FALSE, cf){
         if (nxt == 0){
           nxt <- 1
         }
-        conf_ef <- runif(1,min=-2,max=2)
-        data <- make_edge(cycle[j],cycle[nxt], effect, data, conf_effect = conf_ef)
+        data <- make_edge(cycle[j],cycle[nxt], effect, data)
         
       }
     }
   }
+  
+  for (i in 1:n){
+    cycle <- conf[,i]
+    if (edge){
+      conf_ef <- runif(1,min=-2,max=2)
+      data <- make_conf(cycle[[1]],cycle[[2]], data, conf_effect = conf_ef)
+    }else{
+      for (j in 1:k){
+        nxt <- (j+1)%%(k+1)
+        if (nxt == 0){
+          nxt <- 1
+        }
+        conf_ef <- runif(1,min=-2,max=2)
+        data <- make_conf(cycle[j],cycle[nxt], data, conf_effect = conf_ef)
+        
+      }
+    }
+  }
+  
   return(data)
 }
 
 
 # A wrapper for the above functions
 # Either generates edge set and makes edges, or makes edges for a given edge set
-graph_gen <- function(ncycles, scycle, nedges, data, edgeset = 0){
+graph_gen <- function(ncycles, scycle, nedges, data, edgeset = 0, confset = 0){
   nodes <- list(n=c(1:data$p),l=data$p)
   if(length(edgeset)>0){
     if (edgeset != 0){
-      data <- set_to_edges(edgeset, data, TRUE, 0.5)
+      data <- set_to_edges(edgeset, confset, data, TRUE)
     }else{
       # recommended to keep relatively sparse, as edges can accidentally create cycles
       cycles <- generate_cycle_set(nodes, ncycles, scycle=scycle)
       edges <- generate_edge_set(nodes, nedges)
-      if (length(cycles) != 0){data <- set_to_edges(cycles, data, FALSE, 0.5)}
-      if (length(edges) != 0){data <- set_to_edges(edges, data, TRUE, 0.5)}
+      if (length(cycles) != 0){data <- set_to_edges(cycles, confset, data)}
+      if (length(edges) != 0){data <- set_to_edges(edges, confset, data, TRUE)}
     }
   }
   
@@ -371,9 +391,9 @@ success_thresholder <- function(matr, truth,thresh = 0.15, adj=FALSE){
 }
 
 # does everything
-single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, edgeset = 0, data = 0, broken=FALSE){
+single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, edgeset = 0, confset = 0, data = 0, broken=FALSE){
   dat <- data
-  dat <- graph_gen(ncycles, scycles, nedges, dat, edgeset = edgeset)
+  dat <- graph_gen(ncycles, scycles, nedges, dat, edgeset = edgeset, confset = confset)
   # For missing node tests, strips a data column
   if (broken == TRUE && length(edgeset) > 0){
     rm <- sample(edgeset, 1)[[1]][1]
@@ -444,7 +464,10 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
       for(i in seq(0.01,1,length.out=100)){
         sp <- i
         edgeset2 <- getRandomDag(nodes, sp)
-        edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, data=dat, broken=broken)
+        
+        confset2 <- 
+        
+        edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, confset = confset2, data=dat, broken=broken)
         totalres <- c(totalres, list(edgeRes))
       }
       
@@ -465,7 +488,7 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
         if(edge_lim < 3){
           broken=FALSE
         }
-        edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, data=dat, broken=broken)
+        edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, confset = confset2, data=dat, broken=broken)
         totalres <- c(totalres, list(edgeRes))
       }
     }
@@ -625,17 +648,17 @@ run_tests_subgr(base=10,10,10,broke=FALSE,sparsity=0.5)
 dat <- init_data(50000,4)
 edg <- cbind(c(1,2),c(1,3),c(1,4),c(2,4),c(2,3))
 #edg <- getRandomDag(5,0.5)
-dat <- single_test(4, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, data = dat, broken=FALSE)
+dat <- single_test(4, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, confset = conf, data = dat, broken=FALSE)
 
 # slow!
 dat <- init_data(50000,8)
 edg <- cbind(c(1,2),c(1,3),c(1,4),c(2,4),c(2,3))
 #edg <- getRandomDag(5,0.5)
-dat <- single_test(8, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, data = dat, broken=FALSE)
+dat <- single_test(8, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, confset = conf, data = dat, broken=FALSE)
 
 
 dat <- init_data(50000,100)
 edg <- cbind(c(1,2),c(1,3),c(1,4),c(2,4),c(2,3))
 #edg <- getRandomDag(5,0.5)
-dat <- single_test(100, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, data = dat, broken=FALSE)
+dat <- single_test(100, 50000, 0, 0, 0, prRes=TRUE, edgeset = edg, confset = conf, data = dat, broken=FALSE)
 
