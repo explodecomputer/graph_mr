@@ -31,7 +31,7 @@ options(warn=-1)
 # d <- split each column into the list and add randomly distributed numbers to each element
 # do.call(cbind, d) concatenates the list elements to reform the previous matrix representation
 
-init_data <- function(n, p, pl=0){
+init_data <- function(n, p, pl){
   r <- matrix(0, p, p)
   diag(r) <- 1
   g <- matrix(rbinom(n*p, 2, 0.5), n)
@@ -279,6 +279,7 @@ graph_mr <- function(data){
 
 # a = negative of the inversion of res$b, with diag set to 1, as trait self-relations are trivially related
 inversion_method <- function(res){
+  print(dim(res$b))
   a <- -solve(res$b)
   diag(a) <- 1
   return(a)
@@ -435,8 +436,8 @@ single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, e
 }
 
 # does lots of different levels of sparsity
-do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgeset = 0, broken = FALSE, sparsity = 0){
-  #print(sparsity)
+do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgeset = 0, broken = FALSE, sparsity = 0, cf = 0, pl = 0){
+  #print(pl)
   avgRes <- rbind(
     data.frame(mseTot=0,mseAvg=0,method="Inversion Method",aucTot=0,aucAvg=0,aucSd=0),
     data.frame(mseTot=0,mseAvg=0,method="Feizi Method",aucTot=0,aucAvg=0,aucSd=0),
@@ -458,14 +459,13 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
     if (iter == 1){
       pr = FALSE
     }
-    dat <- init_data(observations, nodes)
+    dat <- init_data(observations, nodes, pl)
     totalres <- list()
     if(sparsity == -1){
       for(i in seq(0.01,1,length.out=100)){
         sp <- i
         edgeset2 <- getRandomDag(nodes, sp)
-        
-        confset2 <- 
+        confset2 <- getRandomDag(nodes, cf)
         
         edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, confset = confset2, data=dat, broken=broken)
         totalres <- c(totalres, list(edgeRes))
@@ -484,7 +484,7 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
             edgeset2 <- cbind(edgeset2, c(ed, ifelse(((ed+1)%%(edgeset+1) == 0), 1, (ed+1))))
           }
         }
-        
+        confset2 <- getRandomDag(nodes, cf)
         if(edge_lim < 3){
           broken=FALSE
         }
@@ -580,8 +580,11 @@ plot_Data <- function(average_auc, n_size, sparse){
   lines(lowess(p_values, average_auc[, 1]), col = 5)
   lines(lowess(p_values, average_auc[, 3]), col = 2)
   lines(lowess(p_values, average_auc[, 5]), col = 3)
+  arrows(p_values,as.numeric(average_auc[, 1])-as.numeric(average_auc[, 2]),p_values,as.numeric(average_auc[, 1])+as.numeric(average_auc[, 2]), code=3, length=0.02, angle = 90,col = 5)
   points(p_values , average_auc[, 3], pch=19,col = 2)
+  arrows(p_values,as.numeric(average_auc[, 3])-as.numeric(average_auc[, 4]),p_values,as.numeric(average_auc[, 3])+as.numeric(average_auc[, 4]), code=3, length=0.02, angle = 90,col = 2)
   points(p_values , average_auc[, 5], pch=19,col = 3)
+  arrows(p_values,as.numeric(average_auc[, 5])-as.numeric(average_auc[, 6]),p_values,as.numeric(average_auc[, 5])+as.numeric(average_auc[, 6]), code=3, length=0.02, angle = 90,col = 3)
   
   legend(
     "bottomright",
@@ -620,11 +623,11 @@ plot_Data <- function(average_auc, n_size, sparse){
 
 
 # for subgraph test of network sizes base -> limit, very slow
-run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity=0)
+run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity=0,cf=cf,pl=pl)
 {
   for(i  in base : (limit)){
     print(i)
-    dis <- do_test(iter, i, 2000, 0, 0, 0, edgeset=i,broken=broke,sparsity=sparsity)
+    dis <- do_test(iter, i, 2000, 0, 0, 0, edgeset=i,broken=broke,sparsity=sparsity,cf=cf,pl=pl)
     #print(head(dis))
     plot_Data(dis, i,FALSE)
   }
@@ -635,11 +638,11 @@ run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity=0)
 # for sparsity tests, for given network size 
 run_tests_sparse <- function(nwork, iter, broke=FALSE){
   print("sparsity test")
-  dis <- do_test(iter,nwork,2000,0,0,0,edgeset = 99,broken=broke,sparsity=-1)
+  dis <- do_test(iter,nwork,2000,0,0,0,edgeset = 99,broken=broke,sparsity=-1,cf=0.5)
   plot_Data(dis, 99,TRUE)
 }
 
-run_tests_subgr(base=9,9,10,broke=FALSE,sparsity=0.5)
+run_tests_subgr(base=9,9,10,broke=FALSE,sparsity=0.5,cf=0.2,pl=0.5)
 # The largest base size for the simulations to be finished in a reasonable time
 run_tests_subgr(base=10,10,10,broke=FALSE,sparsity=0.5)
 #run_tests_sparse(5,5, broke = TRUE)
