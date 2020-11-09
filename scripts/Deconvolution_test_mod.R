@@ -357,6 +357,7 @@ plot_from_matrix_clean <- function(mat, title="")
 getRandomDag <- function(nodes, sparsity){
   dag <- NULL
   dag <- randomDAG(nodes, sparsity)
+  
   edg <- makeEdgeList(edges(dag))
   
   return(edg)
@@ -518,10 +519,16 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
     avgCompRes[[x]][2, 'aucAvg'] <- avgCompRes[[x]][2, 'aucTot'] / iter
     avgCompRes[[x]][3, 'aucAvg'] <- avgCompRes[[x]][3, 'aucTot'] / iter
     avgCompRes[[x]][1, 'aucSd'] <- sd(as.numeric(as.vector(InvSd[x,])))
+    avgCompRes[[x]][1, 'aucUci'] <- quantile(as.numeric(as.vector(InvSd[x,])), 0.975)
+    avgCompRes[[x]][1, 'aucLci'] <- quantile(as.numeric(as.vector(InvSd[x,])), 0.025)
     avgCompRes[[x]][2, 'aucSd'] <- sd(as.numeric(as.vector(FeiSd[x,])))
+    avgCompRes[[x]][2, 'aucUci'] <- quantile(as.numeric(as.vector(FeiSd[x,])), 0.975)
+    avgCompRes[[x]][2, 'aucLci'] <- quantile(as.numeric(as.vector(FeiSd[x,])), 0.025)
     avgCompRes[[x]][3, 'aucSd'] <- sd(as.numeric(as.vector(NDSd[x,])))
+    avgCompRes[[x]][3, 'aucUci'] <- quantile(as.numeric(as.vector(NDSd[x,])), 0.975)
+    avgCompRes[[x]][3, 'aucLci'] <- quantile(as.numeric(as.vector(NDSd[x,])), 0.025)
     
-    displayDat <- rbind(displayDat, cbind(cbind(avgCompRes[[x]][1,'aucAvg'],avgCompRes[[x]][1,'aucSd']),cbind(avgCompRes[[x]][2,'aucAvg'],avgCompRes[[x]][2,'aucSd']),cbind(avgCompRes[[x]][3,'aucAvg'],avgCompRes[[x]][3,'aucSd'])))
+    displayDat <- rbind(displayDat, cbind(cbind(avgCompRes[[x]][1,'aucAvg'],avgCompRes[[x]][1,'aucSd'],avgCompRes[[x]][1,'aucUci'],avgCompRes[[x]][1,'aucLci']),cbind(avgCompRes[[x]][2,'aucAvg'],avgCompRes[[x]][2,'aucSd'],avgCompRes[[x]][2,'aucUci'],avgCompRes[[x]][2,'aucLci']),cbind(avgCompRes[[x]][3,'aucAvg'],avgCompRes[[x]][3,'aucSd'],avgCompRes[[x]][3,'aucUci'],avgCompRes[[x]][3,'aucLci'])))
   }
   return(displayDat)
 }
@@ -578,13 +585,13 @@ plot_Data <- function(average_auc, n_size, sparse){
     )
   }
   lines(lowess(p_values, average_auc[, 1]), col = 5)
-  lines(lowess(p_values, average_auc[, 3]), col = 2)
-  lines(lowess(p_values, average_auc[, 5]), col = 3)
-  arrows(p_values,as.numeric(average_auc[, 1])-as.numeric(average_auc[, 2]),p_values,as.numeric(average_auc[, 1])+as.numeric(average_auc[, 2]), code=3, length=0.02, angle = 90,col = 5)
-  points(p_values , average_auc[, 3], pch=19,col = 2)
-  arrows(p_values,as.numeric(average_auc[, 3])-as.numeric(average_auc[, 4]),p_values,as.numeric(average_auc[, 3])+as.numeric(average_auc[, 4]), code=3, length=0.02, angle = 90,col = 2)
-  points(p_values , average_auc[, 5], pch=19,col = 3)
-  arrows(p_values,as.numeric(average_auc[, 5])-as.numeric(average_auc[, 6]),p_values,as.numeric(average_auc[, 5])+as.numeric(average_auc[, 6]), code=3, length=0.02, angle = 90,col = 3)
+  lines(lowess(p_values, average_auc[, 5]), col = 2)
+  lines(lowess(p_values, average_auc[, 9]), col = 3)
+  arrows(p_values,as.numeric(average_auc[, 3]),p_values,as.numeric(average_auc[, 4]), code=3, length=0.02, angle = 90,col = 5)
+  points(p_values , average_auc[, 5], pch=19,col = 2)
+  arrows(p_values,as.numeric(average_auc[, 7]),p_values,as.numeric(average_auc[, 8]), code=3, length=0.02, angle = 90,col = 2)
+  points(p_values , average_auc[, 9], pch=19,col = 3)
+  arrows(p_values,as.numeric(average_auc[, 11]),p_values,as.numeric(average_auc[, 12]), code=3, length=0.02, angle = 90,col = 3)
   
   legend(
     "bottomright",
