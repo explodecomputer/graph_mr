@@ -20,39 +20,6 @@ suppressPackageStartupMessages(suppressWarnings({
 options(warn=-1)
 
 
-
-
-
-# This function will give a list of nodes to remove to prune a correlation matrix at some threshold. 
-# only developed it for correlation matrices rather than asymmetric MR matrices so just check it makes sense for that also
-
-greedy_remove <- function(r, threshold=0.99)
-{
-  diag(r) <- 0
-  flag <- 1
-  rem <- c()
-  colnames(r)=1:ncol(r)
-  rownames(r)=colnames(r)
-  nom <- colnames(r)
-  while(flag == 1)
-  {
-    message("iteration")
-    count <- apply(r, 2, function(x) sum(x >= threshold))
-    if(any(count > 0))
-    {
-      worst <- which.max(count)[1]
-      rem <- c(rem, names(worst))
-      r <- r[-worst,-worst]
-    } else {
-      flag <- 0
-    }
-  }
-  return(which(nom %in% rem))
-  #return(r)
-}
-
-
-
 # empty matrix dims p x p
 # set to ident matrix
 # n - number of samples
@@ -445,34 +412,18 @@ single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, e
   res3 <- deconvolution_method(res)
   res4 <- deconv_corr(corr$b)
   
-  # Pruning
-  
-  MSE2=meanSquareError(res2[-greedy_remove(res2),-greedy_remove(res2)], dat$r[-greedy_remove(res2),-greedy_remove(res2)])
-  MSE3=meanSquareError(res3[-greedy_remove(res3),-greedy_remove(res3)], dat$r[-greedy_remove(res3),-greedy_remove(res3)])
-  MSE4=meanSquareError(res4[-greedy_remove(res4),-greedy_remove(res4)], dat$r[-greedy_remove(res4),-greedy_remove(res4)])
-  MSEB=meanSquareError(res$b[-greedy_remove(res$b),-greedy_remove(res$b)], dat$r[-greedy_remove(res$b),-greedy_remove(res$b)])
-  
-  res2 <- res2[-greedy_remove(res2),-greedy_remove(res2)]
-  res3 <- res3[-greedy_remove(res3),-greedy_remove(res3)]
-  res4 <- res4[-greedy_remove(res4),-greedy_remove(res4)]
-  res$b <- res$b[-greedy_remove(res$b),-greedy_remove(res$b)]
-  
-  #MSE2=meanSquareError(res2, dat$r)
-  #MSE3=meanSquareError(res3, dat$r)
-  #MSE4=meanSquareError(res4, dat$r)
-  #MSEB=meanSquareError(res$b, dat$r)
+  MSE2=meanSquareError(res2, dat$r)
+  MSE3=meanSquareError(res3, dat$r)
+  MSE4=meanSquareError(res4, dat$r)
+  MSEB=meanSquareError(res$b, dat$r)
   
   adj_mat <- ifelse(dat$r != 0, 1, 0)
   diag(res4) <- 1
   resall <- rbind(
-    #data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion", mse=MSE2, auc=c(auc(roc.for.matrix(success_thresholder(res2,dat$r,adj=FALSE),adj_mat)))),
-    #data.frame(estimate=c(res3), truth=c(dat$r), method="Feizi", mse=MSE3, auc=c(auc(roc.for.matrix(success_thresholder(res3,dat$r,adj=FALSE),adj_mat)))),
-    #data.frame(estimate=c(res4), truth=c(dat$r), method="ND Correlation mat", mse=MSE4, auc=c(auc(roc.for.matrix(success_thresholder(res4,dat$r,adj=TRUE),adj_mat)))),
-    #data.frame(estimate=c(res$b), truth=c(dat$r), method="Total effects", mse=MSEB, auc=c(auc(success_thresholder(res$b,dat$r,adj=TRUE),adj_mat)))
-    data.frame(estimate=c(res2), truth=c(dat$r[-greedy_remove(res2),-greedy_remove(res2)]), method="Inversion", mse=MSE2, auc=c(auc(roc.for.matrix(success_thresholder(res2,dat$r[-greedy_remove(res2),-greedy_remove(res2)],adj=FALSE),adj_mat)))),
-    data.frame(estimate=c(res3), truth=c(dat$r[-greedy_remove(res3),-greedy_remove(res3)]), method="Feizi", mse=MSE3, auc=c(auc(roc.for.matrix(success_thresholder(res3,dat$r[-greedy_remove(res3),-greedy_remove(res3)],adj=FALSE),adj_mat)))),
-    data.frame(estimate=c(res4), truth=c(dat$r[-greedy_remove(res4),-greedy_remove(res4)]), method="ND Correlation mat", mse=MSE4, auc=c(auc(roc.for.matrix(success_thresholder(res4,dat$r[-greedy_remove(res4),-greedy_remove(res4)],adj=TRUE),adj_mat)))),
-    data.frame(estimate=c(res$b), truth=c(dat$r[-greedy_remove(res$b),-greedy_remove(res$b)]), method="Total effects", mse=MSEB, auc=c(auc(success_thresholder(res$b,dat$r[-greedy_remove(res$b),-greedy_remove(res$b)],adj=TRUE),adj_mat)))
+    data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion", mse=MSE2, auc=c(auc(roc.for.matrix(success_thresholder(res2,dat$r,adj=FALSE),adj_mat)))),
+    data.frame(estimate=c(res3), truth=c(dat$r), method="Feizi", mse=MSE3, auc=c(auc(roc.for.matrix(success_thresholder(res3,dat$r,adj=FALSE),adj_mat)))),
+    data.frame(estimate=c(res4), truth=c(dat$r), method="ND Correlation mat", mse=MSE4, auc=c(auc(roc.for.matrix(success_thresholder(res4,dat$r,adj=TRUE),adj_mat)))),
+    data.frame(estimate=c(res$b), truth=c(dat$r), method="Total effects", mse=MSEB, auc=c(auc(success_thresholder(res$b,dat$r,adj=TRUE),adj_mat)))
   )
   
   if(prRes){
