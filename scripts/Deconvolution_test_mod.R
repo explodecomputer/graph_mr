@@ -280,7 +280,7 @@ graph_mr <- function(data){
 
 # a = negative of the inversion of res$b, with diag set to 1, as trait self-relations are trivially related
 inversion_method <- function(res){
-  print(dim(res$b))
+  #print(dim(res$b))
   a <- -solve(res$b)
   diag(a) <- 1
   return(a)
@@ -454,7 +454,7 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
     avgCompRes <- c(avgCompRes,list(avgRes))
   }
   for(it in 1:iter){
-    print(it)
+    #print(it)
     InvSdTmp <- list()
     FeiSdTmp <- list()
     NDSdTmp <- list()
@@ -635,7 +635,7 @@ plot_Data <- function(average_auc, n_size, sparse){
 run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity=0,cf=cf,pl=pl)
 {
   for(i  in base : (limit)){
-    print(i)
+    #print(i)
     dis <- do_test(iter, i, 2000, 0, 0, 0, edgeset=i,broken=broke,sparsity=sparsity,cf=cf,pl=pl)
     #print(head(dis))
     plot_Data(dis, i,FALSE)
@@ -651,7 +651,7 @@ run_tests_sparse <- function(nwork, iter, broke=FALSE){
   plot_Data(dis, 99,TRUE)
 }
 
-run_tests_subgr(base=9,9,10,broke=FALSE,sparsity=0.5,cf=0.2,pl=0.5)
+run_tests_subgr(base=8,9,10,broke=FALSE,sparsity=0.5,cf=0.2,pl=0.5)
 # The largest base size for the simulations to be finished in a reasonable time
 run_tests_subgr(base=10,10,10,broke=FALSE,sparsity=0.5)
 #run_tests_sparse(5,5, broke = TRUE)
