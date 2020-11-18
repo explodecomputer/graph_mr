@@ -1,12 +1,23 @@
 import os
+import json
 
-os.makedirs("../results", exists_ok=True)
+# Setup directories
+with open("config.json", "r") as f:
+  config = json.load(f)
+DATADIR = config["datadir"]
+os.makedirs(DATADIR, exist_ok=True)
+RESULTSDIR = config["resultsdir"]
+os.makedirs(RESULTSDIR, exist_ok=True)
+IMGDIR = config["imgdir"]
+os.makedirs(IMGDIR, exist_ok=True)
+os.makedirs('job_reports', exist_ok=True)
 
-CHUNKS = list(range(1,301))
-CHUNKSIZE = 7
+# Specify chunks
+#CHUNKS = list(range(1,301))
+#CHUNKSIZE = 7
 
-# CHUNKS = list(range(1,2101))
-# CHUNKSIZE = 1
+CHUNKS = list(range(1,2101))
+CHUNKSIZE = 1
 
 rule all:
   input:
@@ -15,12 +26,19 @@ rule all:
 
 rule run_simulations:
   input:
-    "run_sim.r",
-    "functions.r"
+    "run_sim.R",
+    "function_lib.R"
   output: 
     "../results/output_{CHUNK}.rdata"
   shell:
     "Rscript run_sim.r {wildcards.CHUNK} {CHUNKSIZE}"
+
+
+
+
+
+
+
 
 rule aggregate:
   input:
