@@ -632,7 +632,7 @@ plot_Data <- function(average_auc, n_size, sparse){
 
 
 # for subgraph test of network sizes base -> limit, very slow
-run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity=0,cf=cf,pl=pl)
+run_tests_subgr <- function(base=3,limit, iter,broke=FALSE,sparsity,cf,pl)
 {
   for(i  in base : (limit)){
     #print(i)

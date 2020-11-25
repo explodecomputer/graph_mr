@@ -1,16 +1,35 @@
 # Get all the functions
-source("Deconvolution_test_mod.R")
+source("function_lib.R")
 
 # define all parameters
+#param <- expand.grid(
+#  nodes = c(3,5,10,15,20,25,30),
+#  samples = c(100,1000,5000),
+#  sp = seq(0.1,1,by=0.1),
+#  conf = seq(0.1,1,by=0.1),
+#  pl = seq(0.1,1,by=0.1))
+
+
 param <- expand.grid(
-	1:100,
-	1:100
-)
+  nodes = c(10,20,30),
+  samples = c(1000),
+  sp = seq(0.5,0.6,by=0.1),
+  conf = seq(0.5,0.6,by=0.1),
+  pl = seq(0.5,0.6,by=0.1))
+
+# Static parameters
+iter=10
+observations=2000
+edges=0
+cycles=0
+cycle_size=0
+broke=FALSE
 
 # Get the chunk and chunk size from the command line
 args <- commandArgs(T)
 job_id <- as.numeric(args[1])
 job_size <- as.numeric(args[2])
+datadir <- args[3]
 
 # Define the section of params to run for this job
 start <- (job_id - 1) * job_size + 1
@@ -21,9 +40,8 @@ param <- param[start:end, ]
 l <- list()
 for(i in 1:nrow(param))
 {
-	l[[i]] <- run_simulations(param[i, ])
+	l[[i]] <- as.data.frame(do_test(iter, param[i, ]$nodes, observations, edges, cycles, cycle_size, edgeset=param[i, ]$nodes,broken=broke,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl))
+	#l[[i]] <- run_tests_subgr(base=param[i, ]$nodes,param[i, ]$nodes,iter,broke=FALSE,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl)
 }
 
-
-save(l, file=paste("../results/output_", job_id, ".rdata"))
-
+save(l, file=paste0(datadir,"/sim_data/out", job_id, ".rdata"))

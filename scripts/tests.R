@@ -1,5 +1,4 @@
-source("Deconvolution_test_mod.R")
-source("Deconvolution_test_mod2.R")
+source("function_lib.R")
 
 
 run_tests_subgr(base=8,9,10,broke=FALSE,sparsity=0.5,cf=0.2,pl=0.5)

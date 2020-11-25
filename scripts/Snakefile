@@ -6,6 +6,7 @@ with open("config.json", "r") as f:
   config = json.load(f)
 DATADIR = config["datadir"]
 os.makedirs(DATADIR, exist_ok=True)
+os.makedirs(os.path.join(DATADIR,"sim_data"), exist_ok=True)
 RESULTSDIR = config["resultsdir"]
 os.makedirs(RESULTSDIR, exist_ok=True)
 IMGDIR = config["imgdir"]
@@ -16,23 +17,25 @@ os.makedirs('job_reports', exist_ok=True)
 #CHUNKS = list(range(1,301))
 #CHUNKSIZE = 7
 
-CHUNKS = list(range(1,2101))
+CHUNKS = list(range(1,25))
 CHUNKSIZE = 1
 
 rule all:
   input:
-    "../results/simulation_results.rdata",
-    "../docs/simulation_analysis.html"
+    expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
+    #expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS)
+    #"../results/simulation_results.rdata",
+    #"../docs/simulation_analysis.html"
+    #expand("./simulations.html")
 
 rule run_simulations:
   input:
     "run_sim.R",
     "function_lib.R"
-  output: 
-    "../results/output_{CHUNK}.rdata"
+  output:
+    "{DATADIR}/sim_data/out{CHUNKS}.rdata"
   shell:
-    "Rscript run_sim.r {wildcards.CHUNK} {CHUNKSIZE}"
-
+    "Rscript run_sim.R {wildcards.CHUNKS} {CHUNKSIZE} {DATADIR}"
 
 
 
@@ -42,12 +45,20 @@ rule run_simulations:
 
 rule aggregate:
   input:
-    files=expand("../results/output_{CHUNK}.rdata", CHUNK=CHUNKS),
-    rscript="aggregate.r"
+    files=expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS),
+    rscript="aggregate.R"
   output:
-    "../results/simulation_results.rdata"
+    "{DATADIR}/simulations.rdata"
   shell:
     "Rscript {input.rscript} {input.files} {output}"
+
+
+
+
+
+
+
+
 
 rule analysis:
   input:
@@ -57,229 +68,6 @@ rule analysis:
     "../docs/simulation_analysis.html"
   shell:
     "Rscript -e \"rmarkdown::render('{input.rmd}'))\""
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import os
-import json
-
-# Setup directories
-with open("config.json", "r") as f:
-  config = json.load(f)
-DATADIR = config["datadir"]
-os.makedirs(DATADIR, exist_ok=True)
-RESULTSDIR = config["resultsdir"]
-os.makedirs(RESULTSDIR, exist_ok=True)
-PHENDIR = config["phendir"]
-GENODIR = config["genodir"]
-VCFDIR = config["vcfdir"]
-PIPELINEDIR = config["pipelinedir"]
-USER = os.environ['USER']
-BOLTDIR = "/mnt/storage/home/" + USER + "/downloads/BOLT-LMM_v2.3.4"
-IGDDIR = config["igddir"]
-SDDIR = config["sddir"]
-IMGDIR = config["imgdir"]
-os.makedirs(IMGDIR, exist_ok=True)
-os.makedirs('job_reports', exist_ok=True)
-
-# Define chromosomes
-CHR = ["%.2d" % i for i in range(1,23)]
-
-# Discovery and replication
-col=["discovery", "replication"]
-
-# Define the list of datasets that we want to make
-idlist = [x for x in os.listdir(IGDDIR) if 'ukb-b' in x]
-DATA = [x.strip().lower() for x in idlist]
-with open(DATADIR + "/ukb-b-idlist.txt", 'w') as f:
-  [f.writelines(x + '\n') for x in DATA]
-col = ["discovery", "replication"]
-
-
-rule all:
-  input: 
-    #expand("{RESULTSDIR}/{data}/{col}.stats.txt.gz", RESULTSDIR = RESULTSDIR, col=col, data=DATA)
-    #expand("{DATADIR}/count_tophits.txt", DATADIR=DATADIR),
-    #expand("{RESULTSDIR}/{data}/MR_Het_All_vs_All.txt", RESULTSDIR = RESULTSDIR, data=DATA)
-    expand("{DATADIR}/Regression_estimates.txt", DATADIR = DATADIR)
-
-
-# Create a mapping of old ukb-b IDs to new
-rule create_dict:
-  output:
-    "{DATADIR}/dict.rdata",
-    "{DATADIR}/Phenotypes.txt"
-  shell:
-    """
-cwd=$(pwd)
-cd {DATADIR}
-Rscript $cwd/phen_ID_mapping.r
-head -n 1 {PHENDIR}/data/derived/phesant_mod/*.txt | sed '/^$/d' > temp1
-paste <(grep "^==" temp1 | sed 's/==> //g' | sed 's/ <==//g') <(grep -v "^==" temp1) > temp2
-head temp2
-Rscript $cwd/make_phenotype_dictionary.r
-rm temp1 temp2
-    """
-
-rule create_second_linker:
-  output:
-    "{DATADIR}/second_linker.rdata"
-  shell:
-    "Rscript second_linker.r {PHENDIR} {output}"
-
-# Create PC file
-rule create_pcs:
-  output:
-    "{DATADIR}/pcs.txt"
-  shell:
-    """
-Rscript create_pc_file.r \
-{GENODIR}/data/derived/principal_components/data.pca1-40.plink.txt \
-{GENODIR}/data/derived/related/relateds_exclusions/data.minimal_relateds.plink.txt \
-{PIPELINEDIR}/data/covariates/data.covariates_ieu.bolt.txt \
-{DATADIR}/pcs.txt
-    """
-
-
-# Split the sample into discovery and replication IDs
-rule choose_discovery_ids:
-  output:
-    "{DATADIR}/discoveryids.txt"
-  shell:
-    """
-cwd=$(pwd)
-cd {DATADIR}
-Rscript $cwd/choose_discovery_ids.r \
-{GENODIR}/data/dosage_bgen/data.chr1-22.sample \
-100 \
-{DATADIR}/discoveryids.txt
-    """
-
-
-# Create a list of SNPs to analyse - tophits from ukb-b analysis
-rule create_snplist:
-  output:
-    "{DATADIR}/snplist.txt"
-  shell:
-    "cat {IGDDIR}/ukb-b-*/clump.txt | sort -u > {output}"
-
-
-# Subset of ukb data, including only variants in snplist.txt
-rule create_bgen:
-  input:
-    expand("{DATADIR}/snplist.txt", DATADIR=DATADIR)
-  output:
-    "{DATADIR}/extract.chr{chr}.bgen"
-  shell:
-    "qctool -bgen-bits 8 -g {GENODIR}/data/dosage_bgen/data.chr{wildcards.chr}.bgen -incl-rsids {input} -og {DATADIR}/extract.chr{wildcards.chr}.bgen"
-
-
-# Create discovery and replication phenotype files
-rule create_phen:
-  input:
-    expand("{DATADIR}/dict.rdata", DATADIR=DATADIR),
-    expand("{DATADIR}/discoveryids.txt", DATADIR=DATADIR),
-    expand("{DATADIR}/second_linker.rdata", DATADIR=DATADIR)
-  output:
-    "{RESULTSDIR}/{data}/phen.txt"
-  shell:
-    """
-Rscript make_phenotype_file.r \
-{wildcards.data} \
-{DATADIR}/dict.rdata \
-{PHENDIR}/data/derived/phesant_mod \
-{PHENDIR}/data/linker_app15825.csv \
-{DATADIR}/second_linker.rdata \
-{DATADIR}/discoveryids.txt \
-{RESULTSDIR}/{wildcards.data}
-    """
-
-
-# Perform analysis
-rule run_gwas:
-  input:
-    "{RESULTSDIR}/{data}/phen.txt",
-    expand("{DATADIR}/extract.chr{chr}.bgen", chr=CHR, DATADIR=DATADIR)
-  output:
-    "{RESULTSDIR}/{data}/{col}.stats.txt.gz"
-  shell:
-    """
-python run_replication.py \
---ukbbid {wildcards.data} \
---dictionaryfile {DATADIR}/dict.rdata \
---phesantdir {PHENDIR}/data/derived/phesant_mod \
---discoveryids {DATADIR}/discoveryids.txt \
---resultdir {RESULTSDIR} \
---bolt_exe_dir {BOLTDIR} \
---bfile {PIPELINEDIR}/data/bolt_bfile/grm6_european_filtered_ieu \
---bgenDir {DATADIR} \
---boltSampleFile {GENODIR}/data/dosage_bgen/data.chr1-22.sample \
---geneticMapFile {BOLTDIR}/tables/genetic_map_hg19_withX.txt.gz \
---bgenMinMaf '0.001' \
---covarFile {PIPELINEDIR}/data/covariates/data.covariates_ieu.bolt.txt \
---qcovarCol '{{sex,chip}}' \
---pcFile {DATADIR}/pcs.txt \
---pcCovarCol 'V{{1:42}}' \
---LDscoresFile {BOLTDIR}/tables/LDSCORE.1000G_EUR.tab.gz \
---numThreads 3 \
---modelSnps {PIPELINEDIR}/data/model_snps_for_grm/grm6_snps.prune.in \
---linker {PHENDIR}/data/linker_app15825.csv \
---column {wildcards.col}
-    """
-
-
-
-# Count tophits
-rule top_hits:
-  input:
-    expand("{RESULTSDIR}/{data}/{col}.stats.txt.gz", RESULTSDIR = RESULTSDIR, col=col, data=DATA)
-  output:
-    "{DATADIR}/count_tophits.txt"
-  shell:
-    "Rscript count_tophits.r {IGDDIR} {DATADIR} {RESULTSDIR}"
-
-
-# MR all vs all
-# Preparation
-rule mr_prep:
-  input:
-    expand("{DATADIR}/count_tophits.txt", DATADIR=DATADIR)
-  output:
-    "{DATADIR}/MR_prep.RData"
-  shell:
-    "Rscript ../../mr/scripts/mr_prep.r {DATADIR}"
-
-
-# Run the analysis
-rule mr_all:
-  input:
-    expand("{DATADIR}/MR_prep.RData", DATADIR=DATADIR)
-  output:
-    "{RESULTSDIR}/{data}/MR_Het_All_vs_All.txt"
-  shell:
-    "Rscript ../../mr/scripts/mr_All_vs_All.r {DATADIR} {RESULTSDIR} {VCFDIR} {wildcards.data}"
-
-
-# Combine the results
-rule combine_res:
-  input:
-    expand("{RESULTSDIR}/{data}/MR_Het_All_vs_All.txt", RESULTSDIR = RESULTSDIR, data=DATA)
-  output:
-    "{DATADIR}/Regression_estimates.txt"
-  shell:
-    "Rscript ../../mr/scripts/mr_combine_res.r {DATADIR} {RESULTSDIR} {SDDIR} {IMGDIR}"
 
 
 
