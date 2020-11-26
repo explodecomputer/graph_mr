@@ -532,6 +532,32 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
     
     displayDat <- rbind(displayDat, cbind(cbind(avgCompRes[[x]][1,'aucAvg'],avgCompRes[[x]][1,'aucSd'],avgCompRes[[x]][1,'aucUci'],avgCompRes[[x]][1,'aucLci']),cbind(avgCompRes[[x]][2,'aucAvg'],avgCompRes[[x]][2,'aucSd'],avgCompRes[[x]][2,'aucUci'],avgCompRes[[x]][2,'aucLci']),cbind(avgCompRes[[x]][3,'aucAvg'],avgCompRes[[x]][3,'aucSd'],avgCompRes[[x]][3,'aucUci'],avgCompRes[[x]][3,'aucLci'])))
   }
+
+  displayDat <- lapply(displayDat, unlist) %>% as.data.frame %>%
+    {rbind(
+      tibble(
+        method = "Inversion - MR matrix",
+        subgraph_size = seq(0 , 100, length.out = param[i, ]$nodes+1),
+        auc = .$V1,
+        uci = .$V3,
+        lci = .$V4
+      ),
+      tibble(
+        method = "ND - MR matrix",
+        subgraph_size = seq(0 , 100, length.out = param[i, ]$nodes+1),
+        auc = .$V5,
+        uci = .$V7,
+        lci = .$V8
+      ),
+      tibble(
+        method = "ND - correlation matrix",
+        subgraph_size = seq(0 , 100, length.out = param[i, ]$nodes+1),
+        auc = .$V5,
+        uci = .$V7,
+        lci = .$V8
+      )
+    )}
+
   return(displayDat)
 }
 
@@ -604,7 +630,7 @@ plot_Data <- function(average_auc, n_size, sparse){
     bty = "n",
     y.intersp = 1.5
   )
-  
+
   #sd plots
   
   Bplt <- ggplot(subset(df,Col %in% c('B')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='red')) +

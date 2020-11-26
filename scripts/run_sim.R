@@ -40,8 +40,13 @@ param <- param[start:end, ]
 l <- list()
 for(i in 1:nrow(param))
 {
-	l[[i]] <- as.data.frame(do_test(iter, param[i, ]$nodes, observations, edges, cycles, cycle_size, edgeset=param[i, ]$nodes,broken=broke,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl))
+	out <- as.data.frame(do_test(iter, param[i, ]$nodes, observations, edges, cycles, cycle_size, edgeset=param[i, ]$nodes,broken=broke,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl))
+	for(j in names(param))
+	{
+		out[[j]] <- param[[j]][i]
+	}
+	l[[i]] <- out
 	#l[[i]] <- run_tests_subgr(base=param[i, ]$nodes,param[i, ]$nodes,iter,broke=FALSE,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl)
 }
-
+l <- dplyr::bind_rows(l)
 save(l, file=paste0(datadir,"/sim_data/out", job_id, ".rdata"))
