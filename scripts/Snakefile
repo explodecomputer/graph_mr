@@ -22,10 +22,10 @@ CHUNKSIZE = 1
 
 rule all:
   input:
-    expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
+    "../docs/simulation_analysis.html"
+    #expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
     #expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS)
     #"../results/simulation_results.rdata",
-    #"../docs/simulation_analysis.html"
     #expand("./simulations.html")
 
 rule run_simulations:
@@ -37,12 +37,6 @@ rule run_simulations:
   shell:
     "Rscript run_sim.R {wildcards.CHUNKS} {CHUNKSIZE} {DATADIR}"
 
-
-
-
-
-
-
 rule aggregate:
   input:
     files=expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS),
@@ -52,22 +46,14 @@ rule aggregate:
   shell:
     "Rscript {input.rscript} {input.files} {output}"
 
-
-
-
-
-
-
-
-
 rule analysis:
   input:
-    rdata="../results/simulation_results.rdata",
+    rdata=expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR),
     rmd="../docs/simulation_results.rmd"
   output:
     "../docs/simulation_analysis.html"
   shell:
-    "Rscript -e \"rmarkdown::render('{input.rmd}'))\""
+    "Rscript -e \"rmarkdown::render('{input.rmd}'))\" {DATADIR} {IMGDIR}"
 
 
 

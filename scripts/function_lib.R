@@ -533,28 +533,33 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
     displayDat <- rbind(displayDat, cbind(cbind(avgCompRes[[x]][1,'aucAvg'],avgCompRes[[x]][1,'aucSd'],avgCompRes[[x]][1,'aucUci'],avgCompRes[[x]][1,'aucLci']),cbind(avgCompRes[[x]][2,'aucAvg'],avgCompRes[[x]][2,'aucSd'],avgCompRes[[x]][2,'aucUci'],avgCompRes[[x]][2,'aucLci']),cbind(avgCompRes[[x]][3,'aucAvg'],avgCompRes[[x]][3,'aucSd'],avgCompRes[[x]][3,'aucUci'],avgCompRes[[x]][3,'aucLci'])))
   }
 
+  displayDat=as.data.frame(displayDat)
+
   displayDat <- lapply(displayDat, unlist) %>% as.data.frame %>%
     {rbind(
       tibble(
         method = "Inversion - MR matrix",
-        subgraph_size = seq(0 , 100, length.out = param[i, ]$nodes+1),
+        subgraph_size = seq(0 , 100, length.out = nodes+1),
         auc = .$V1,
+        sd = .$V2,
         uci = .$V3,
         lci = .$V4
       ),
       tibble(
         method = "ND - MR matrix",
-        subgraph_size = seq(0 , 100, length.out = param[i, ]$nodes+1),
+        subgraph_size = seq(0 , 100, length.out = nodes+1),
         auc = .$V5,
+        sd = .$V6,
         uci = .$V7,
         lci = .$V8
       ),
       tibble(
         method = "ND - correlation matrix",
-        subgraph_size = seq(0 , 100, length.out = param[i, ]$nodes+1),
-        auc = .$V5,
-        uci = .$V7,
-        lci = .$V8
+        subgraph_size = seq(0 , 100, length.out = nodes+1),
+        auc = .$V9,
+        sd = .$V10,
+        uci = .$V11,
+        lci = .$V12
       )
     )}
 

@@ -19,7 +19,6 @@ param <- expand.grid(
 
 # Static parameters
 iter=10
-observations=2000
 edges=0
 cycles=0
 cycle_size=0
@@ -40,7 +39,7 @@ param <- param[start:end, ]
 l <- list()
 for(i in 1:nrow(param))
 {
-	out <- as.data.frame(do_test(iter, param[i, ]$nodes, observations, edges, cycles, cycle_size, edgeset=param[i, ]$nodes,broken=broke,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl))
+	out <- as.data.frame(do_test(iter, param[i, ]$nodes, param[i, ]$samples, edges, cycles, cycle_size, edgeset=param[i, ]$nodes,broken=broke,sparsity=param[i, ]$sp,cf=param[i, ]$conf,pl=param[i, ]$pl))
 	for(j in names(param))
 	{
 		out[[j]] <- param[[j]][i]
