@@ -12,10 +12,6 @@ output <- args[length(args)]
 #chunk_filelist <- args[1]
 #output <- args[2]
 
-print(chunk_filelist)
-class(chunk_filelist)
-print(output)
-
 result <- list()
 for(i in chunk_filelist)
 {

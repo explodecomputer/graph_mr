@@ -10,12 +10,20 @@ source("function_lib.R")
 #  pl = seq(0.1,1,by=0.1))
 
 
+# Get the chunk and chunk size from the command line
+args <- commandArgs(T)
+job_id <- as.numeric(args[1])
+job_size <- as.numeric(args[2])
+datadir <- args[3]
+
 param <- expand.grid(
   nodes = c(10,20,30),
   samples = c(1000),
-  sp = seq(0.5,0.6,by=0.1),
-  conf = seq(0.5,0.6,by=0.1),
-  pl = seq(0.5,0.6,by=0.1))
+  sp = seq(0,1,by=0.2),
+  conf = seq(0,1,by=0.2),
+  pl = seq(0,1,by=0.2))
+
+#save(param, file=paste0(datadir,"/parameters.rdata"))
 
 # Static parameters
 iter=10
@@ -23,12 +31,6 @@ edges=0
 cycles=0
 cycle_size=0
 broke=FALSE
-
-# Get the chunk and chunk size from the command line
-args <- commandArgs(T)
-job_id <- as.numeric(args[1])
-job_size <- as.numeric(args[2])
-datadir <- args[3]
 
 # Define the section of params to run for this job
 start <- (job_id - 1) * job_size + 1

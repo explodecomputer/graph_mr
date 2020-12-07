@@ -140,6 +140,10 @@ set_to_edges <- function(set, conf, data, edge=FALSE){
     }
   }
   
+  if (is.null(conf) | length(conf) < 1){
+    return(data)
+  }
+
   for (i in 1:n){
     cycle <- conf[,i]
     if (edge){
@@ -589,6 +593,7 @@ plot_Data <- function(average_auc, n_size, sparse){
     mgp = c(2, .5, 0),
     family = 'serif'
   )
+
   if(sparse == TRUE){
     plot(
       p_values,
