@@ -22,7 +22,8 @@ CHUNKSIZE = 1
 
 rule all:
   input:
-    expand("{IMGDIR}/simulation_results.html", IMGDIR = IMGDIR)
+    expand("{IMGDIR}/structures.html", IMGDIR = IMGDIR)
+    #expand("{IMGDIR}/simulation_results.html", IMGDIR = IMGDIR)
     #expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
     #expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS)
     #"../results/simulation_results.rdata",
@@ -54,6 +55,14 @@ rule analysis:
     "{IMGDIR}/simulation_results.html"
   shell:
     "Rscript -e \"rmarkdown::render('{input.rmd}', output_dir='{IMGDIR}')\" {DATADIR} {IMGDIR}"
+
+rule structures:
+  input:
+    rmd="structures.rmd"
+  output:
+    "{IMGDIR}/structures.html"
+  shell:
+    "Rscript -e \"rmarkdown::render('{input.rmd}', output_dir='{IMGDIR}')\""
 
 
 
