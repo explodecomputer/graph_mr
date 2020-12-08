@@ -67,6 +67,23 @@ make_edge <- function(i, j, effect, data)
   return(data)
 }
 
+
+normalise_r <- function(dat)
+{
+  s <- apply(dat$d, 2, sd)
+  o <- dat$r
+  for(i in 1:dat$p)
+  {
+    for(j in 1:dat$p)
+    {
+      o[i,j] <- o[i,j] * s[j] / s[i]
+    }
+  }
+  dat$r_norm <- o
+  return(dat)
+}
+
+
 make_conf <- function(i, j, data, conf_effect=0)
 {
   u <- rnorm(nrow(data$d))
@@ -182,7 +199,7 @@ graph_gen <- function(ncycles, scycle, nedges, data, edgeset = 0, confset = 0){
     }
   }
   
-  
+  data <- normalise_r(data)
   return(data)
 }
 
@@ -190,7 +207,10 @@ graph_gen <- function(ncycles, scycle, nedges, data, edgeset = 0, confset = 0){
 
 meanSquareError <- function(gr, tGr){
   MSE <- sum((tGr - gr)^2)/length(tGr)
+  cor(as.numeric(gr), as.numeric(tGr))^2
 }
+
+
 
 # After the data is generated, process it
 
@@ -265,20 +285,28 @@ graph_mr <- function(data){
   p <- ncol(data$d)
   b <- matrix(1, p, p)
   se <- matrix(0, p, p)
+  pval <- matrix(0, p, p)
   for(i in 1:p){
     for(j in 1:p){
       if(i != j){
         a <- tsls(data$d[, i], data$d[, j], data$g[, j])
         b[i, j] <- a$bhat
         se[i, j] <- a$se
+        pval[i, j] <- a$pval
       }
     }
   }
-  return(list(b=b, se=se))
+  return(list(b=b, se=se, pval=pval))
 }
 
-
-
+# make correlation matrix
+# obfuscating function call for my own readability
+make_cor_mat <- function(d){
+  b <- cor(d)
+  se <- sqrt((1-b^2)/(nrow(d)-2))
+  pval <- pnorm(abs(b/se), lower.tail=FALSE)
+  return(list(b=b, se=se, pval=pval))
+}
 
 # Methods:
 
@@ -300,36 +328,94 @@ deconvolution_method <- function(res){
   return(out)
 }
 
+#' Estimate the bigge
+#'
+#' <full description>
+#'
+#' @param res <what param does>
+#' @param nboot=100 <what param does>
+#' @param minp=1e-300 <what param does>
+#' @param fn <what param does>
+#' @param ... <what param does>
+#'
+#' @export
+#' @return
+bootstrap_deconv <- function(res, nboot=100, minp=1e-300, fn=deconv, ...)
+{
+  out <- list()
+  b <- fn(res$b, ...)
+
+  out$b <- b
+  if(!is.null(nboot))
+  {
+    n <- ncol(res$b)
+    l <- list()
+    for(i in 1:nboot)
+    {
+      newb <- matrix(rnorm(n * n, mean=res$b, sd=res$se), n, n)
+      temp <- fn(newb, ...)
+      l[[i]] <- temp
+    }
+
+    addsq <- function(x, y) {
+      return(x^2 + y^2)
+    }
+
+    m <- Reduce('+', l)
+    m2 <- Reduce('+', lapply(l, function(x) x^2))
+    
+    out$se <- sqrt((m2 - m^2 / nboot) / nboot)
+    out$pval <- pnorm(abs(out$b/out$se), lower=FALSE)
+    out$pval[out$pval < minp] <- minp
+    diag(out$pval) <- 1
+  }
+  return(out)
+}
+
+
 # function that matrix multiplies x by the inverse of itself plus a same size ident matrix 
-dir <- function(x)
-  return(x %*% solve(x + diag(nrow(x))))
+deconv <- function(x, remove_diag=TRUE)
+{
+  if(remove_diag) diag(x) <- 0
+  d <- determinant(x)$modulus
+  if(is.finite(d))
+  {
+    o <- x %*% solve(x + diag(nrow(x)))
+  } else {
+    o <- x %*% corpcor::pseudoinverse(x + diag(nrow(x)))
+  }
+  if(remove_diag) diag(o) <- 1
+  return(o)
+}
+
 
 # normalizes values by a value alpha, dependent on the relative scales of max_e and min_e, being the largest and smallest eigenvalues
 normalize_beta <- function(x, beta=0.95){
-  xe <- eigen(x)
-  max_e <- max(xe$values)
-  min_e <- min(xe$values)
-  alpha <- min(beta / ((1-beta) * max_e), -beta / ((1+beta) * min_e))
+  alpha <- tryCatch({
+    xe <- eigen(x)
+    max_e <- max(xe$values)
+    min_e <- min(xe$values)
+    alpha <- min(beta / ((1-beta) * max_e), -beta / ((1+beta) * min_e))
+    alpha
+  },
+  error=function(cond) {
+    return(1)
+  })
   return(alpha)
 }
 
-# make correlation matrix
-# obfuscating function call for my own readability
-make_cor_mat <- function(d){
-  correl <- list(b=cor(d))
-  return(correl)
-}
-
-#deconv correlation matrix, normalize determines whether to normalize, alpha act as an adjustment, the diagonal 1s are stripped out for dir()
+#deconv correlation matrix, normalize determines whether to normalize, alpha act as an adjustment, the diagonal 1s are stripped out for deconv()
 deconv_corr <- function(corr, normalize=TRUE, alpha=1){
+  diag(corr) <- 0
   inp <- corr
   if(normalize && alpha == 1){
     alpha <- normalize_beta(inp)
-    deconv_matrix <- dir(inp*alpha)   
+    deconv_matrix <- deconv(inp*alpha)   
   }else if (alpha == 1)
-    deconv_matrix <- dir(inp)
+    deconv_matrix <- deconv(inp)
   else
-    deconv_matrix <- dir(alpha * (inp))
+    deconv_matrix <- deconv(alpha * (inp))
+  diag(corr) <- 1
   return(deconv_matrix)
 }
 
@@ -376,31 +462,93 @@ makeEdgeList <- function(edges){
 
 # Data checks
 
-# Calculates the ROC for given matrices
-roc.for.matrix <-
-  function(networkweights ,adjacencymatrix ,filtermatrix = NULL) {
-    require(pROC)
-    x <- abs(networkweights)
-    y <- adjacencymatrix
-    suppressWarnings(roc(y, x))
-  }
-
-# Classifies non-binary result matrix
-success_thresholder <- function(matr, truth,thresh = 0.15, adj=FALSE){
-  matr <- abs(matr)
-  truth <- abs(truth)
-  if (adj == TRUE){
-    out <- ifelse(matr > 0.5, 1, 0)
-  }else{
-    out <- ifelse(abs(matr-truth) < thresh*matr, 1, 0)
-  }
-  return(out)
+edge_matrix <- function(mat)
+{
+  tr <- diag(nrow(mat))
+  tr[lower.tri(tr)] <- mat[lower.tri(mat)] != 0 | t(mat)[lower.tri(t(mat))] != 0
+  tr[upper.tri(tr)] <- t(tr)[upper.tri(tr)]
+  tr
 }
 
+
+#' Use p-value to predict edge detection
+#'
+#' Asymmetric matrix has two opportunities to detect an edge - upper and lower triangles
+#' Only compare the off-diagonal elements
+#' Get the union of edges from lower and upper triangles from the truth adjacency matrix
+#'
+#' @param mat Deconv list (includes pval)
+#' @param truth True adjacency matrix
+#'
+#' @export
+#' @return
+auc_edge_detection <- function(res, truth)
+{
+  # just use lower triangle - it's symmatrical now
+  mat <- -log10(res$pval)
+  mat1 <- mat[lower.tri(mat)]
+  mat2 <- t(mat)[lower.tri(t(mat))]
+  mat <- pmax(mat1, mat2)
+  truth <- edge_matrix(truth)
+  truth <- truth[lower.tri(truth)]
+  tryCatch(
+      pROC::roc(truth, mat, quiet=TRUE) %>% pROC::auc(),
+    error=function(cond) NA
+  )  
+}
+
+
+#' Use -log10 p-values to predict oriented edges
+#'
+#' @param res Deconv list (includes pval)
+#' @param truth True adjacency matrix
+#'
+#' @export
+#' @return
+auc_edge_orientation <- function(res, truth)
+{
+  mat <- -log10(res$pval)
+  truth <- truth != 0
+
+  # remove diagonal
+  mat <- c(mat[lower.tri(mat)], mat[upper.tri(mat)])
+  truth <- c(truth[lower.tri(truth)], truth[upper.tri(truth)])
+  tryCatch(
+    pROC::roc(truth, mat, quiet=TRUE) %>% pROC::auc(),
+    error=function(cond) NA
+  )
+}
+
+
+# cor
+
+#' Estimate bias of estimates
+#'
+#' Similar to MSE but uses correlation - scale free so can compare MR and correlation matrices
+#'
+#' @param mat estimated graph
+#' @param truth True adjacency matrix
+#'
+#' @export
+#' @return
+corComparison <- function(mat, truth){
+  mat <- c(mat[lower.tri(mat)], mat[upper.tri(mat)])
+  truth <- c(truth[lower.tri(truth)], truth[upper.tri(truth)])
+  cor(mat, truth)^2
+}
+
+
+sig_graph <- function(res, fdrthresh=0.05)
+{
+  s <- res$pval %>% p.adjust(., "fdr") %>% {. < fdrthresh} %>% matrix(., nrow(res$pval))
+  b <- res$b
+  b[!s] <- 0
+  return(b)
+}
+
+
 # does everything
-single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, edgeset = 0, confset = 0, data = 0, broken=FALSE){
-  dat <- data
-  dat <- graph_gen(ncycles, scycles, nedges, dat, edgeset = edgeset, confset = confset)
+single_test <- function(dat, prRes=FALSE, broken=FALSE, save_comparison=FALSE){
   # For missing node tests, strips a data column
   if (broken == TRUE && length(edgeset) > 0){
     rm <- sample(edgeset, 1)[[1]][1]
@@ -409,35 +557,101 @@ single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, e
     dat$g <- dat$g[,-rm]
     dat$r <- dat$r[,-rm]
     dat$r <- dat$r[-rm,]
+    dat$r_norm <- dat$r_norm[,-rm]
+    dat$r_norm <- dat$r_norm[-rm,]
   }
-  res <- graph_mr(dat) 
-  corr <- make_cor_mat(dat$d)
-  res2 <- inversion_method(res)
-  res3 <- deconvolution_method(res)
-  res4 <- deconv_corr(corr$b)
-  
-  MSE2=meanSquareError(res2, dat$r)
-  MSE3=meanSquareError(res3, dat$r)
-  MSE4=meanSquareError(res4, dat$r)
-  MSEB=meanSquareError(res$b, dat$r)
-  
-  adj_mat <- ifelse(dat$r != 0, 1, 0)
-  diag(res4) <- 1
-  resall <- rbind(
-    data.frame(estimate=c(res2), truth=c(dat$r), method="Inversion", mse=MSE2, auc=c(auc(roc.for.matrix(success_thresholder(res2,dat$r,adj=FALSE),adj_mat)))),
-    data.frame(estimate=c(res3), truth=c(dat$r), method="Feizi", mse=MSE3, auc=c(auc(roc.for.matrix(success_thresholder(res3,dat$r,adj=FALSE),adj_mat)))),
-    data.frame(estimate=c(res4), truth=c(dat$r), method="ND Correlation mat", mse=MSE4, auc=c(auc(roc.for.matrix(success_thresholder(res4,dat$r,adj=TRUE),adj_mat)))),
-    data.frame(estimate=c(res$b), truth=c(dat$r), method="Total effects", mse=MSEB, auc=c(auc(success_thresholder(res$b,dat$r,adj=TRUE),adj_mat)))
+ 
+  method_list <- c(
+    "Total - MR", 
+    "Total - Cor", 
+    "ND - MR", 
+    "ND - Cor", 
+    "ND+norm - Cor"
   )
+  res1 <- graph_mr(dat)
+  res2 <- make_cor_mat(dat$d)
+  res3 <- bootstrap_deconv(res1, fn=deconv)
+  res4 <- bootstrap_deconv(res2, fn=deconv_corr, normalize=FALSE)
+  res5 <- bootstrap_deconv(res2, fn=deconv_corr)
+
+  resall <- list()
+  resall$performance <- tibble(
+    method = method_list,
+    accuracy = c(
+      corComparison(res1$b, dat$r),
+      corComparison(res2$b, dat$r_norm),
+      corComparison(res3$b, dat$r),
+      corComparison(res4$b, dat$r_norm),
+      corComparison(res5$b, dat$r_norm)
+    ),
+    edge_detection = c(
+      auc_edge_detection(res1, dat$r),
+      auc_edge_detection(res2, dat$r_norm),
+      auc_edge_detection(res3, dat$r),
+      auc_edge_detection(res4, dat$r_norm),
+      auc_edge_detection(res5, dat$r_norm)
+    ),
+    edge_orientation = c(
+      auc_edge_orientation(res1, dat$r),
+      auc_edge_orientation(res2, dat$r_norm),
+      auc_edge_orientation(res3, dat$r),
+      auc_edge_orientation(res4, dat$r_norm),
+      auc_edge_orientation(res5, dat$r_norm)
+    )
+  )
+
+  m <- expand.grid(i=1:dat$p, j=1:dat$p)
+  
+  if(save_comparison)
+  {
+    resall$comparison <- list(
+      tibble(
+        method = method_list[1],
+        i = m$i,
+        j = m$j,
+        estimate = c(res1$b),
+        truth = c(dat$r)
+      ),
+      tibble(
+        method = method_list[2],
+        i = m$i,
+        j = m$j,
+        estimate = c(res2$b),
+        truth = c(dat$r_norm)
+      ),    
+      tibble(
+        method = method_list[3],
+        i = m$i,
+        j = m$j,
+        estimate = c(res3$b),
+        truth = c(dat$r)
+      ),
+      tibble(
+        method = method_list[4],
+        i = m$i,
+        j = m$j,
+        estimate = c(res4$b),
+        truth = c(dat$r_norm)
+      ),
+      tibble(
+        method = method_list[5],
+        i = m$i,
+        j = m$j,
+        estimate = c(res5$b),
+        truth = c(dat$r_norm)
+      )
+    ) %>% bind_rows()
+
+  }
   
   if(prRes){
     par(mfrow=c(2,3))
-    plot_from_matrix(dat$r, "True graph", 0)
-    plot_from_matrix(res$b, "Total effects" ,MSEB)
-    plot(1, type="n", axes=F, xlab="", ylab="")
-    plot_from_matrix(res2, "Inversion Method" , MSE2)
-    plot_from_matrix(res3, "Feizi Method" , MSE3)
-    plot_from_matrix(res4, "ND Correlation Mat" , MSE4)
+    plot_from_matrix(dat$r, "True graph", "")
+    plot_from_matrix(sig_graph(res1), method_list[1] , resall$performance$accuracy[1])
+    plot_from_matrix(sig_graph(res2), method_list[2] , resall$performance$accuracy[2])
+    plot_from_matrix(sig_graph(res3), method_list[3] , resall$performance$accuracy[3])
+    plot_from_matrix(sig_graph(res4), method_list[4] , resall$performance$accuracy[4])
+    plot_from_matrix(sig_graph(res5), method_list[5] , resall$performance$accuracy[4])
   }
   return(resall)
 }
@@ -446,7 +660,6 @@ single_test <- function(gsize, datsize, nedges, ncycles, scycles, prRes=FALSE, e
 do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgeset = 0, broken = FALSE, sparsity = 0, cf = 0, pl = 0){
   #print(pl)
   avgRes <- rbind(
-    data.frame(mseTot=0,mseAvg=0,method="Inversion Method",aucTot=0,aucAvg=0,aucSd=0),
     data.frame(mseTot=0,mseAvg=0,method="Feizi Method",aucTot=0,aucAvg=0,aucSd=0),
     data.frame(mseTot=0,mseAvg=0,method="ND Correlation Mat",aucTot=0,aucAvg=0,aucSd=0)
   )
@@ -457,6 +670,8 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
   for (x in 1:(edgeset+1)){
     avgCompRes <- c(avgCompRes,list(avgRes))
   }
+  totalres <- list()
+  j <- 1
   for(it in 1:iter){
     #print(it)
     InvSdTmp <- list()
@@ -467,20 +682,23 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
       pr = FALSE
     }
     dat <- init_data(observations, nodes, pl)
-    totalres <- list()
     if(sparsity == -1){
       for(i in seq(0.01,1,length.out=100)){
         sp <- i
         edgeset2 <- getRandomDag(nodes, sp)
         confset2 <- getRandomDag(nodes, cf)
         
-        edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, confset = confset2, data=dat, broken=broken)
-        totalres <- c(totalres, list(edgeRes))
+        dat <- graph_gen(cycles, cycle_size, edges, data=dat, edgeset = edgeset2, confset = confset2)
+        edgeRes <- single_test(dat, prRes = pr, broken=broken, save_comparison=FALSE)$performance
+        edgeRes$it <- it
+        edgeRes$sp <- i
+        totalres[[j]] <- edgeRes
+        j <- j + 1
       }
       
     }else{
       
-      for(edge_lim in 0:edgeset){
+      for(edge_lim in 1:edgeset){
         if (edge_lim == 0) {
           edgeset2 = NULL
         }else if (sparsity > 0){
@@ -495,175 +713,37 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
         if(edge_lim < 3){
           broken=FALSE
         }
-        edgeRes <- single_test(nodes, observations, edges, cycles, cycle_size, prRes = pr, edgeset = edgeset2, confset = confset2, data=dat, broken=broken)
-        totalres <- c(totalres, list(edgeRes))
+        dat <- graph_gen(cycles, cycle_size, edges, data=dat, edgeset = edgeset2, confset = confset2)
+        edgeRes <- single_test(dat, prRes = pr, broken=broken, save_comparison=FALSE)$performance
+        edgeRes$it <- it
+        edgeRes$sp <- edge_lim
+        totalres[[j]] <- edgeRes
+        j <- j + 1
       }
     }
-    
-    for(x in 1:(edgeset+1)){
-      tempMse <- totalres[[x]]
-      avgCompRes[[x]][1, 'mseTot'] <- avgCompRes[[x]][1, 'mseTot'] + tempMse[1, 'mse']
-      avgCompRes[[x]][1, 'aucTot'] <- avgCompRes[[x]][1, 'aucTot'] + tempMse[1, 'auc']
-      InvSdTmp <- c(InvSdTmp,tempMse[1, 'auc'])
-      avgCompRes[[x]][2, 'mseTot'] <- avgCompRes[[x]][2, 'mseTot'] + tempMse[1 + (nodes^2), 'mse']
-      avgCompRes[[x]][2, 'aucTot'] <- avgCompRes[[x]][2, 'aucTot'] + tempMse[1 + (nodes^2), 'auc']
-      FeiSdTmp <- c(FeiSdTmp,tempMse[1 + (nodes^2), 'auc'])
-      avgCompRes[[x]][3, 'mseTot'] <- avgCompRes[[x]][3, 'mseTot'] + tempMse[1 + (nodes^2)*2, 'mse']
-      avgCompRes[[x]][3, 'aucTot'] <- avgCompRes[[x]][3, 'aucTot'] + tempMse[1 + (nodes^2)*2, 'auc']
-      NDSdTmp <- c(NDSdTmp,tempMse[1 + (nodes^2)*2, 'auc'])
-    }
-    InvSd <- cbind(InvSd,InvSdTmp)
-    FeiSd <- cbind(FeiSd,FeiSdTmp)
-    NDSd <- cbind(NDSd,NDSdTmp)        
-  }
-  displayDat <- list()
-  for(x in 1:(edgeset+1)){
-    avgCompRes[[x]][1, 'mseAvg'] <- avgCompRes[[x]][1, 'mseTot'] / iter
-    avgCompRes[[x]][2, 'mseAvg'] <- avgCompRes[[x]][2, 'mseTot'] / iter
-    avgCompRes[[x]][3, 'mseAvg'] <- avgCompRes[[x]][3, 'mseTot'] / iter
-    avgCompRes[[x]][1, 'aucAvg'] <- avgCompRes[[x]][1, 'aucTot'] / iter
-    avgCompRes[[x]][2, 'aucAvg'] <- avgCompRes[[x]][2, 'aucTot'] / iter
-    avgCompRes[[x]][3, 'aucAvg'] <- avgCompRes[[x]][3, 'aucTot'] / iter
-    avgCompRes[[x]][1, 'aucSd'] <- sd(as.numeric(as.vector(InvSd[x,])))
-    avgCompRes[[x]][1, 'aucUci'] <- quantile(as.numeric(as.vector(InvSd[x,])), 0.975)
-    avgCompRes[[x]][1, 'aucLci'] <- quantile(as.numeric(as.vector(InvSd[x,])), 0.025)
-    avgCompRes[[x]][2, 'aucSd'] <- sd(as.numeric(as.vector(FeiSd[x,])))
-    avgCompRes[[x]][2, 'aucUci'] <- quantile(as.numeric(as.vector(FeiSd[x,])), 0.975)
-    avgCompRes[[x]][2, 'aucLci'] <- quantile(as.numeric(as.vector(FeiSd[x,])), 0.025)
-    avgCompRes[[x]][3, 'aucSd'] <- sd(as.numeric(as.vector(NDSd[x,])))
-    avgCompRes[[x]][3, 'aucUci'] <- quantile(as.numeric(as.vector(NDSd[x,])), 0.975)
-    avgCompRes[[x]][3, 'aucLci'] <- quantile(as.numeric(as.vector(NDSd[x,])), 0.025)
-    
-    displayDat <- rbind(displayDat, cbind(cbind(avgCompRes[[x]][1,'aucAvg'],avgCompRes[[x]][1,'aucSd'],avgCompRes[[x]][1,'aucUci'],avgCompRes[[x]][1,'aucLci']),cbind(avgCompRes[[x]][2,'aucAvg'],avgCompRes[[x]][2,'aucSd'],avgCompRes[[x]][2,'aucUci'],avgCompRes[[x]][2,'aucLci']),cbind(avgCompRes[[x]][3,'aucAvg'],avgCompRes[[x]][3,'aucSd'],avgCompRes[[x]][3,'aucUci'],avgCompRes[[x]][3,'aucLci'])))
   }
 
-  displayDat=as.data.frame(displayDat)
-
-  displayDat <- lapply(displayDat, unlist) %>% as.data.frame %>%
-    {rbind(
-      tibble(
-        method = "Inversion - MR matrix",
-        subgraph_size = seq(0 , 100, length.out = nodes+1),
-        auc = .$V1,
-        sd = .$V2,
-        uci = .$V3,
-        lci = .$V4
-      ),
-      tibble(
-        method = "ND - MR matrix",
-        subgraph_size = seq(0 , 100, length.out = nodes+1),
-        auc = .$V5,
-        sd = .$V6,
-        uci = .$V7,
-        lci = .$V8
-      ),
-      tibble(
-        method = "ND - correlation matrix",
-        subgraph_size = seq(0 , 100, length.out = nodes+1),
-        auc = .$V9,
-        sd = .$V10,
-        uci = .$V11,
-        lci = .$V12
-      )
-    )}
-
-  return(displayDat)
+  out <- totalres %>% bind_rows %>%
+    tidyr::gather(key="measure", value="value", accuracy, edge_detection, edge_orientation) %>%
+    group_by(method, sp, measure) %>%
+    summarise(
+      m = mean(value, na.rm=TRUE),
+      s = sd(value, na.rm=TRUE),
+      lci = quantile(value, 0.025, na.rm=TRUE),
+      uci = quantile(value, 0.975, na.rm=TRUE)
+    )
+  return(out)
 }
 
 
-#Test Framework and plotting function
-
-plot_Data <- function(average_auc, n_size, sparse){
-  p_values = seq(0 , 100, length.out = n_size+1)
-  invsd=as.numeric(rbind(as.numeric(average_auc[,1])-as.numeric(average_auc[,2]),as.numeric(average_auc[,1])+as.numeric(average_auc[,2])))
-  feisd=as.numeric(rbind(as.numeric(average_auc[,3])-as.numeric(average_auc[,4]),as.numeric(average_auc[,3])+as.numeric(average_auc[,4])))
-  NDsd=as.numeric(rbind(as.numeric(average_auc[,5])-as.numeric(average_auc[,6]),as.numeric(average_auc[,5])+as.numeric(average_auc[,6])))
-  
-  df <- data.frame(
-    sp=as.numeric(rbind(p_values,p_values,p_values)),
-    sdsp=as.numeric(rbind(p_values,p_values,p_values,p_values,p_values,p_values)),
-    avgAuc = as.numeric(rbind(as.numeric(average_auc[,1])),as.numeric(average_auc[,3]),as.numeric(average_auc[,5])),
-    Aucsd=as.numeric(rbind(invsd,feisd,NDsd)),
-    Col = as.character(rbind(rep('B',n_size+1),rep('C',n_size+1),rep('D',n_size+1))),
-    ColSd = as.character(rbind(rep('B',2*(n_size+1)),rep('C',2*(n_size+1)),rep('D',2*(n_size+1)))))
-  par(
-    mfrow = c(1, 1),
-    mar = c(4.1 , 4.1, 1.2, 0.1) ,
-    xpd = TRUE ,
-    mgp = c(2, .5, 0),
-    family = 'serif'
-  )
-
-  if(sparse == TRUE){
-    plot(
-      p_values,
-      average_auc[, 1],
-      xlab = "% Network Sparsity",
-      ylab = "Average AUC",
-      xlim = c(0, 100),
-      ylim = c(0.5, 1),
-      pch = 19,
-      col = 5,
-      lty = 1,
-      main = "Network sparsity against AUC",
-    )
-  }else{
-    plot(
-      p_values,
-      average_auc[, 1],
-      xlab = "% Available subgraph size",
-      ylab = "Average AUC",
-      xlim = c(0, 100),
-      ylim = c(0.5 , 1),
-      pch=19,
-      col = 5,
-      lty = 1,
-      main = "Graph Density against AUC",
-      sub = paste(c(n_size, "node network"), collapse = " ")
-    )
-  }
-  lines(lowess(p_values, average_auc[, 1]), col = 5)
-  lines(lowess(p_values, average_auc[, 5]), col = 2)
-  lines(lowess(p_values, average_auc[, 9]), col = 3)
-  arrows(p_values,as.numeric(average_auc[, 3]),p_values,as.numeric(average_auc[, 4]), code=3, length=0.02, angle = 90,col = 5)
-  points(p_values , average_auc[, 5], pch=19,col = 2)
-  arrows(p_values,as.numeric(average_auc[, 7]),p_values,as.numeric(average_auc[, 8]), code=3, length=0.02, angle = 90,col = 2)
-  points(p_values , average_auc[, 9], pch=19,col = 3)
-  arrows(p_values,as.numeric(average_auc[, 11]),p_values,as.numeric(average_auc[, 12]), code=3, length=0.02, angle = 90,col = 3)
-  
-  legend(
-    "bottomright",
-    inset = c(0.3 , 0),
-    c("Inversion method","Feizi method","ND Correlation Method"),
-    col = c(5,2,3),
-    lty = 1,
-    bty = "n",
-    y.intersp = 1.5
-  )
-
-  #sd plots
-  
-  Bplt <- ggplot(subset(df,Col %in% c('B')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='red')) +
-    stat_summary(geom="ribbon", fun.ymin="min", fun.ymax="max",fill='red', aes(x=sdsp,y=Aucsd), alpha=0.1) +
-    theme_bw() + 
-    coord_cartesian(xlim =c(min(p_values),max(p_values)), ylim = c(0.5, 1)) +
-    labs(x = "% Available Subgraph", y='AUC') +
-    theme(legend.position = "none")
-  Cplt <- ggplot(subset(df,Col %in% c('C')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='green')) +
-    stat_summary(geom="ribbon", fun.ymin="min", fun.ymax="max",fill='green', aes(x=sdsp,y=Aucsd), alpha=0.1) +
-    theme_bw() + 
-    coord_cartesian(xlim =c(min(p_values),max(p_values)), ylim = c(0.5, 1)) +
-    labs(x = "% Available Subgraph", y='AUC') +
-    theme(legend.position = "none")
-  Dplt <- ggplot(subset(df,Col %in% c('D')), aes(x=head(sp,n_size + 1),y=head(avgAuc,n_size+1), colour='blue')) +
-    stat_summary(geom="ribbon", fun.ymin="min", fun.ymax="max", fill='blue',aes(x=sdsp,y=Aucsd), alpha=0.1) +
-    theme_bw() + 
-    coord_cartesian(xlim =c(min(p_values),max(p_values)), ylim = c(0.5, 1)) +
-    labs(x = "% Available Subgraph", y='AUC') +
-    theme(legend.position = "none")
-  
-  ggarrange(Bplt, Cplt, Dplt, 
-            ncol = 2, nrow = 2)
+plot_Data <- function(out)
+{
+  ggplot(out, aes(x=sp, y=m)) +
+  geom_point(aes(colour=method)) +
+  geom_line(aes(colour=method)) +
+  geom_errorbar(aes(ymin=lci, ymax=uci, colour=method), width=0) +
+  facet_grid(. ~ measure) +
+  scale_colour_brewer(type="qual")
 }
 
 
