@@ -17,7 +17,7 @@ os.makedirs('job_reports', exist_ok=True)
 #CHUNKS = list(range(1,301))
 #CHUNKSIZE = 7
 
-CHUNKS = list(range(1,649))
+CHUNKS = list(range(1,1001))
 CHUNKSIZE = 1
 
 rule all:

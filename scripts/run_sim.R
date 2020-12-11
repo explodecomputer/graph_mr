@@ -17,11 +17,11 @@ job_size <- as.numeric(args[2])
 datadir <- args[3]
 
 param <- expand.grid(
-  nodes = c(10,20,30),
+  nodes = c(10),
   samples = c(1000),
-  sp = seq(0,1,by=0.2),
-  conf = seq(0,1,by=0.2),
-  pl = seq(0,1,by=0.2))
+  sp = seq(0.1,1,by=0.1),
+  conf = seq(0.1,1,by=0.1),
+  pl = seq(0.1,1,by=0.1))
 
 #save(param, file=paste0(datadir,"/parameters.rdata"))
 
