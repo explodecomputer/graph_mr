@@ -684,14 +684,14 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
     dat <- init_data(observations, nodes, pl)
     if(sparsity == -1){
       for(i in seq(0.01,1,length.out=100)){
-        sp <- i
-        edgeset2 <- getRandomDag(nodes, sp)
+        subgr_size <- i
+        edgeset2 <- getRandomDag(nodes, subgr_size)
         confset2 <- getRandomDag(nodes, cf)
         
         dat <- graph_gen(cycles, cycle_size, edges, data=dat, edgeset = edgeset2, confset = confset2)
         edgeRes <- single_test(dat, prRes = pr, broken=broken, save_comparison=FALSE)$performance
         edgeRes$it <- it
-        edgeRes$sp <- i
+        edgeRes$subgr_size <- i
         totalres[[j]] <- edgeRes
         j <- j + 1
       }
@@ -716,7 +716,7 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
         dat <- graph_gen(cycles, cycle_size, edges, data=dat, edgeset = edgeset2, confset = confset2)
         edgeRes <- single_test(dat, prRes = pr, broken=broken, save_comparison=FALSE)$performance
         edgeRes$it <- it
-        edgeRes$sp <- edge_lim
+        edgeRes$subgr_size <- edge_lim
         totalres[[j]] <- edgeRes
         j <- j + 1
       }
@@ -725,7 +725,7 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
 
   out <- totalres %>% bind_rows %>%
     tidyr::gather(key="measure", value="value", accuracy, edge_detection, edge_orientation) %>%
-    group_by(method, sp, measure) %>%
+    group_by(method, subgr_size, measure) %>%
     summarise(
       m = mean(value, na.rm=TRUE),
       s = sd(value, na.rm=TRUE),
