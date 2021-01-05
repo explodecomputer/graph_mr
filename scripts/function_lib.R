@@ -738,7 +738,7 @@ do_test <- function(iter, nodes, observations, edges, cycles, cycle_size, edgese
 
 plot_Data <- function(out)
 {
-  ggplot(out, aes(x=sp, y=m)) +
+  ggplot(out, aes(x=subgr_size, y=m)) +
   geom_point(aes(colour=method)) +
   geom_line(aes(colour=method)) +
   geom_errorbar(aes(ymin=lci, ymax=uci, colour=method), width=0) +

@@ -22,9 +22,9 @@ CHUNKSIZE = 1
 
 rule all:
   input:
-    #expand("{IMGDIR}/structures.html", IMGDIR = IMGDIR)
+    expand("{IMGDIR}/structures.html", IMGDIR = IMGDIR)
     #expand("{IMGDIR}/simulation_results.html", IMGDIR = IMGDIR)
-    expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
+    #expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
     #expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS)
     #"../results/simulation_results.rdata",
     #expand("./simulations.html")
