@@ -17,7 +17,7 @@ os.makedirs('job_reports', exist_ok=True)
 #CHUNKS = list(range(1,301))
 #CHUNKSIZE = 7
 
-CHUNKS = list(range(1,1001))
+CHUNKS = list(range(1,1211))
 CHUNKSIZE = 1
 
 rule all:
@@ -58,6 +58,7 @@ rule analysis:
 
 rule structures:
   input:
+    expand("{IMGDIR}/simulation_results.html", IMGDIR = IMGDIR),
     rmd="structures.rmd"
   output:
     "{IMGDIR}/structures.html"

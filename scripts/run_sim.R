@@ -20,8 +20,8 @@ param <- expand.grid(
   nodes = c(10),
   samples = c(1000),
   sp = seq(0.1,1,by=0.1),
-  conf = seq(0.1,1,by=0.1),
-  pl = seq(0.1,1,by=0.1))
+  conf = seq(0,1,by=0.1),
+  pl = seq(0,1,by=0.1))
 
 #save(param, file=paste0(datadir,"/parameters.rdata"))
 
