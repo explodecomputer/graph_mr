@@ -26,7 +26,7 @@ param <- expand.grid(
 #save(param, file=paste0(datadir,"/parameters.rdata"))
 
 # Static parameters
-iter=10
+iter=100
 edges=0
 cycles=0
 cycle_size=0
