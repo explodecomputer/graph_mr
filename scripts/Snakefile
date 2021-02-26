@@ -18,7 +18,7 @@ os.makedirs('job_reports', exist_ok=True)
 #CHUNKSIZE = 7
 
 CHUNKS = list(range(1,1211))
-CHUNKSIZE = 1
+CHUNKSIZE = 4
 
 rule all:
   input:
@@ -31,8 +31,7 @@ rule all:
 
 rule run_simulations:
   input:
-    "run_sim.R",
-    "function_lib.R"
+    "run_sim.R"
   output:
     "{DATADIR}/sim_data/out{CHUNKS}.rdata"
   shell:

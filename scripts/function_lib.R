@@ -741,7 +741,7 @@ plot_Data <- function(out)
   ggplot(out, aes(x=subgr_size, y=m)) +
   geom_point(aes(colour=method)) +
   geom_line(aes(colour=method)) +
-  geom_errorbar(aes(ymin=lci, ymax=uci, colour=method), width=0) +
+  #geom_errorbar(aes(ymin=lci, ymax=uci, colour=method), width=0) +
   facet_grid(. ~ measure) +
   scale_colour_brewer(type="qual")
 }

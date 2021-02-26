@@ -18,7 +18,7 @@ datadir <- args[3]
 
 param <- expand.grid(
   nodes = c(10),
-  samples = c(1000),
+  samples = c(1000,10000,20000,100000),
   sp = seq(0.1,1,by=0.1),
   conf = seq(0,1,by=0.1),
   pl = seq(0,1,by=0.1))
