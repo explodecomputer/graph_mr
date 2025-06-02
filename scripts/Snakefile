@@ -1,0 +1,69 @@
+import os
+import json
+
+# Setup directories
+with open("config.json", "r") as f:
+  config = json.load(f)
+DATADIR = config["datadir"]
+os.makedirs(DATADIR, exist_ok=True)
+os.makedirs(os.path.join(DATADIR,"sim_data"), exist_ok=True)
+RESULTSDIR = config["resultsdir"]
+os.makedirs(RESULTSDIR, exist_ok=True)
+IMGDIR = config["imgdir"]
+os.makedirs(IMGDIR, exist_ok=True)
+os.makedirs('job_reports', exist_ok=True)
+
+# Specify chunks
+#CHUNKS = list(range(1,301))
+#CHUNKSIZE = 7
+
+CHUNKS = list(range(1,1211))
+CHUNKSIZE = 4
+
+rule all:
+  input:
+    expand("{IMGDIR}/structures.html", IMGDIR = IMGDIR)
+    #expand("{IMGDIR}/simulation_results.html", IMGDIR = IMGDIR)
+    #expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR)
+    #expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS)
+    #"../results/simulation_results.rdata",
+    #expand("./simulations.html")
+
+rule run_simulations:
+  input:
+    "run_sim.R"
+  output:
+    "{DATADIR}/sim_data/out{CHUNKS}.rdata"
+  shell:
+    "Rscript run_sim.R {wildcards.CHUNKS} {CHUNKSIZE} {DATADIR}"
+
+rule aggregate:
+  input:
+    files=expand("{DATADIR}/sim_data/out{CHUNKS}.rdata", DATADIR = DATADIR, CHUNKS=CHUNKS),
+    rscript="aggregate.R"
+  output:
+    "{DATADIR}/simulations.rdata"
+  shell:
+    "Rscript {input.rscript} {input.files} {output}"
+
+rule analysis:
+  input:
+    rdata=expand("{DATADIR}/simulations.rdata", DATADIR = DATADIR),
+    rmd="simulation_results.rmd"
+  output:
+    "{IMGDIR}/simulation_results.html"
+  shell:
+    "Rscript -e \"rmarkdown::render('{input.rmd}', output_dir='{IMGDIR}')\" {DATADIR} {IMGDIR}"
+
+rule structures:
+  input:
+    expand("{IMGDIR}/simulation_results.html", IMGDIR = IMGDIR),
+    rmd="structures.rmd"
+  output:
+    "{IMGDIR}/structures.html"
+  shell:
+    "Rscript -e \"rmarkdown::render('{input.rmd}', output_dir='{IMGDIR}')\""
+
+
+
+
